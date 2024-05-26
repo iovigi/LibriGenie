@@ -6,8 +6,7 @@ export default async function handler(req, res) {
   let result = await SignUp(email, password);
 
   if (result.isSuccess) {
-    console.log({ result });
-    setCookie('token', result.token, { req, res })
+    setCookie('token', result.token, { req, res, maxAge: 60 * 60 * 24 * 7 })
     res.status(200).json({ ok: true, error: "" });
 
     return;

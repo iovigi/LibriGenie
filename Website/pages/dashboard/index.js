@@ -1,19 +1,55 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import styles from '../../styles/Dashboard/Dashboard.module.css';
-import React, { useState } from 'react';
-import 'react-time-picker/dist/TimePicker.css';
-import 'react-clock/dist/Clock.css';
-import TimePicker from 'react-time-picker';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+
+import { toast } from 'react-hot-toast';
 
 
 const Dashboard = function Dashboard() {
-    const [email, setEmail] = useState('');
     const [category, setCategory] = useState('');
     const [time, setTime] = useState('00:00');
     const [enableWordpress, setEnableWordpress] = useState(false);
     const [usernameWordpress, setUsernameWordpress] = useState('');
     const [passwordWordpress, setPasswordWordpress] = useState('');
+    const [rss, setRss] = useState('');
+    const [enable, setEnable] = useState(false);
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+
+        const response = await fetch('/api/dashboard/save-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: "same-origin",
+            body: JSON.stringify({ category, time, enableWordpress, usernameWordpress, passwordWordpress, rss, enable }),
+        })
+
+        if (response.ok) {
+            toast.success("Successfully updated");
+        }
+        else {
+            toast.error("Something went wrong");
+        }
+    }
+
+    useEffect(() => {
+        fetch('/api/dashboard/get-settings', {
+            headers: { 'Content-Type': 'application/json' },
+            credentials: "same-origin",
+        })
+            .then((res) => res.json())
+            .then((data) => {
+                setCategory(data.settings.category);
+                setTime(data.settings.time);
+                setEnableWordpress(data.settings.enableWordpress);
+                setUsernameWordpress(data.settings.usernameWordpress);
+                setPasswordWordpress(data.settings.passwordWordpress);
+                setRss(data.settings.rss);
+                setEnable(data.settings.enable);
+            })
+    }, [])
 
     return (<>
         <Head>
@@ -47,58 +83,58 @@ const Dashboard = function Dashboard() {
                     <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                         <h1 className="h2">Settings</h1>
                     </div>
-                    <div className='container-fluid'>
-                        <div className='row'>
-                            <label className='form-label' htmlFor='email'>Email</label>
-                            <div className='col-3'> <input type="text" className='form-control' placeholder='Enter email' value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-                        </div>
-                        <div className='row mt-3'>
-                            <label className='form-label' htmlFor='time'>Time of the day</label>
-                            <div className='col-3'>
-                                <TimePicker className="form-control" amPmAriaLabel="Select AM/PM"
-                                    clearAriaLabel="Clear value"
-                                    clockAriaLabel="Toggle clock"
-                                    hourAriaLabel="Hour"
-                                    maxDetail="minute"
-                                    minuteAriaLabel="Minute"
-                                    nativeInputAriaLabel="Time" onChange={setTime} value={time} />
-                            </div>
-                        </div>
-                        <div className='row mt-3'>
-                            <div className='col-3'>
-                                <div className='form-check'>
-                                    <input name="enable-wordpress" className='form-check-input' type='checkbox' value={enableWordpress} onChange={(e) => setEnableWordpress(e.target.checked)} />
-                                    <label className='form-check-label' htmlFor='enable-wordpress'>Enable wordpress integration</label>
+                    <div className='container d-flex justify-content-center align-items-center'>
+                        <form className='row w-75' onSubmit={handleSubmit}>
+                            <div className='row mt-3 col-12'>
+                                <label className='form-label' htmlFor='time'>Time of the day</label>
+                                <div className='col-12'>
+                                    <input required type="time" className='form-control' value={time} onChange={(e) => setTime(e.target.value)} />
                                 </div>
                             </div>
-                        </div>
-                        {enableWordpress && <div className='row mt-3'>
-                            <label className='form-label' htmlFor='wordpress-username'>Wordpress Api Username</label>
-                            <div className='col-3'><input type="text" value={usernameWordpress} onChange={(e) => setUsernameWordpress(e.target.value)} className='form-control' placeholder='Enter wordpress api username' /></div>
-                        </div>}
-                        {enableWordpress && <div className='row mt-3'>
-                            <label className='form-label' htmlFor='wordpress-password'>Wordpress API Password</label>
-                            <div className='col-3'><input type="password" value={passwordWordpress} onChange={(e) => setPasswordWordpress(e.target.value)} className='form-control' placeholder='Enter wordpress api password' /></div>
-                        </div>}
-                        <div className='row mt-3'>
-                            <label className='form-label' htmlFor='category'>Category</label>
-                            <div className='col-3'> <select className='form-select' value={category} onChange={(e) => setCategory(e.target.value)}>
-                                <option disabled value="">Please select category</option>
-                                <option value="Joke">Joke</option>
-                                <option value="Poem">Poem</option>
-                                <option value="Summarize">Summarize News</option>
-                            </select></div>
-                        </div>
-                        {category == "Summarize" &&
                             <div className='row mt-3'>
-                                <label className='form-label' htmlFor='rss'>Rss</label>
-                                <div className='col-3'><input type="text" className='form-control' placeholder='Enter rss' /></div>
-                            </div>}
-                        <div className='row mt-3'>
-                            <div className='col-3'>
-                                <button className='btn btn-primary w-100'>Save</button>
+                                <div className='col-12'>
+                                    <div className='form-check'>
+                                        <input name="enable-wordpress" className='form-check-input' type='checkbox' checked={enableWordpress} onChange={(e) => setEnableWordpress(e.target.checked)} />
+                                        <label className='form-check-label' htmlFor='enable-wordpress'>Enable wordpress integration</label>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                            {enableWordpress && <div className='row col-12 mt-3'>
+                                <label className='form-label' htmlFor='wordpress-username'>Wordpress Api Username</label>
+                                <div className='col-12'><input type="text" required value={usernameWordpress} onChange={(e) => setUsernameWordpress(e.target.value)} className='form-control' placeholder='wordpress api username' /></div>
+                            </div>}
+                            {enableWordpress && <div className='row  col-12 mt-3'>
+                                <label className='form-label' htmlFor='wordpress-password'>Wordpress API Password</label>
+                                <div className='col-12'><input type="password" required value={passwordWordpress} onChange={(e) => setPasswordWordpress(e.target.value)} className='form-control' placeholder='wordpress api password' /></div>
+                            </div>}
+                            <div className='row mt-3'>
+                                <label className='form-label' htmlFor='category'>Category</label>
+                                <div className='col-12'> <select className='form-select' value={category} required onChange={(e) => setCategory(e.target.value)}>
+                                    <option disabled value="">Please select category</option>
+                                    <option value="Joke">Joke</option>
+                                    <option value="Poem">Poem</option>
+                                    <option value="Summarize">Summarize News</option>
+                                </select></div>
+                            </div>
+                            {category == "Summarize" &&
+                                <div className='row mt-3'>
+                                    <label className='form-label' htmlFor='rss'>Rss</label>
+                                    <div className='col-12'><input type="url" value={rss} onChange={(e) => setRss(e.target.value)} required className='form-control' placeholder='Enter rss' /></div>
+                                </div>}
+                            <div className='row mt-3'>
+                                <div className='col-12'>
+                                    <div className='form-check'>
+                                        <input name="enable" className='form-check-input' type='checkbox' checked={enable} onChange={(e) => setEnable(e.target.checked)} />
+                                        <label className='form-check-label' htmlFor='enable'>Enable</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className='row mt-3'>
+                                <div>
+                                    <button type='submit' className='btn btn-primary w-100'>Save</button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </main>
             </div>

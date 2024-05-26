@@ -1,7 +1,6 @@
 import { users } from "../db/db";
-import { generateAccessToken, verifyAccessToken } from "./token-generation";
+import { generateAccessToken } from "./token-generation";
 import bcrypt from 'bcrypt'
-import { setCookie, deleteCookie, hasCookie, getCookie, getCookies } from 'cookies-next';
 
 export async function SignIn(email, password) {
     let result = await users.find({ email: email }).limit(1).toArray();

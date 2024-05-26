@@ -1,8 +1,6 @@
 import "bootstrap/dist/css/bootstrap.min.css"; // Import bootstrap CSS
 import "../styles/global.css";
 import { useEffect } from "react";
-import Head from 'next/head';
-import 'react-toastify/dist/ReactToastify.css';
 import { Toaster } from "react-hot-toast";
 
 

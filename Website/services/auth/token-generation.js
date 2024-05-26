@@ -7,7 +7,7 @@ export function generateAccessToken(userId) {
         .setIssuedAt()
         .setExpirationTime("300s")
         .setSubject(userId)
-        .sign(new TextEncoder().encode("SecretKey"));
+        .sign(new TextEncoder().encode(process.env.secret));
 
     return jwt;
 }
@@ -16,7 +16,7 @@ export async function verifyAccessToken(accessToken) {
     try {
         const payload = await jwtVerify(
             accessToken,
-            new TextEncoder().encode("SecretKey")
+            new TextEncoder().encode(process.env.secret)
         );
         if (!payload.payload.sub)
             return {

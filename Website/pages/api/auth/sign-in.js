@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   let result = await SignIn(email, password);
 
   if (result.isSuccess) {
-    setCookie('token', result.token, { req, res, maxAge: 60 * 60 * 24 * 7, sameSite: 'none', secure: true })
+    setCookie('token', result.token, { req, res, maxAge: 60 * 60 * 24 * 7 })
 
     res.status(200).json({ ok: true, error:"" });
     

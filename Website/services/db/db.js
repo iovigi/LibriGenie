@@ -1,6 +1,6 @@
 import { MongoClient } from 'mongodb'
 
-const uri = 'mongodb://localhost:27017/'
+const url = process.env.mongo_url;
 const options = {
     useUnifiedTopology: true,
     useNewUrlParser: true,
@@ -10,7 +10,7 @@ let client
 let clientPromise
 
 
-client = new MongoClient(uri, options)
+client = new MongoClient(url, options)
 clientPromise = client.connect()
 
 const mongoClient = await clientPromise;

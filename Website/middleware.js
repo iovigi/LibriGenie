@@ -4,12 +4,13 @@ export async function middleware(request) {
 
   if (request.nextUrl.pathname.startsWith('/dashboard')) {
     const currentUser = request.cookies.get('token')
-    console.log({currentUser})
     if (!currentUser && !currentUser?.value) {
       return Response.redirect(new URL('/auth/sign-in', request.url))
     }
 
-    if (!IsAuth(currentUser.value)) {
+    var result = !await IsAuth(currentUser.value);
+
+    if (result) {
       return Response.redirect(new URL('/auth/sign-in', request.url))
     }
   }
