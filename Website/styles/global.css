@@ -40,3 +40,7 @@ img {
   max-width: 100%;
   height: auto;
 }
+
+.react-time-picker__wrapper{
+  border:0 !important;
+}

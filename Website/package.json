@@ -6,10 +6,17 @@
     "start": "next start"
   },
   "dependencies": {
+    "bcrypt": "^5.1.1",
     "bootstrap": "^5.3.3",
+    "cookies-next": "^4.2.1",
+    "jose": "^5.3.0",
+    "mongodb": "^6.6.2",
     "next": "latest",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "react-hot-toast": "^2.4.1",
+    "react-time-picker": "^7.0.0",
+    "react-toastify": "^10.0.5"
   },
   "engines": {
     "node": ">=18"
