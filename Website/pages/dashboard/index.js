@@ -103,7 +103,7 @@ const Dashboard = function Dashboard() {
                             </div>
                             {enableWordpress && <div className='row col-12 mt-3'>
                                 <label className='form-label' htmlFor='wordpress-username'>Wordpress Url</label>
-                                <div className='col-12'><input type="text" required value={urlWordpress} onChange={(e) => setUrlWordpress(e.target.value)} className='form-control' placeholder='wordpress Url' /></div>
+                                <div className='col-12'><input type="url" required value={urlWordpress} onChange={(e) => setUrlWordpress(e.target.value)} className='form-control' placeholder='wordpress Url' /></div>
                             </div>}
                             {enableWordpress && <div className='row col-12 mt-3'>
                                 <label className='form-label' htmlFor='wordpress-username'>Wordpress Api Username</label>
