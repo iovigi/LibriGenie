@@ -11,6 +11,7 @@ const Dashboard = function Dashboard() {
     const [category, setCategory] = useState('');
     const [time, setTime] = useState('00:00');
     const [enableWordpress, setEnableWordpress] = useState(false);
+    const [urlWordpress, setUrlWordpress] = useState('');
     const [usernameWordpress, setUsernameWordpress] = useState('');
     const [passwordWordpress, setPasswordWordpress] = useState('');
     const [rss, setRss] = useState('');
@@ -23,7 +24,7 @@ const Dashboard = function Dashboard() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: "same-origin",
-            body: JSON.stringify({ category, time, enableWordpress, usernameWordpress, passwordWordpress, rss, enable }),
+            body: JSON.stringify({ category, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, rss, enable }),
         })
 
         if (response.ok) {
@@ -44,6 +45,7 @@ const Dashboard = function Dashboard() {
                 setCategory(data.settings.category);
                 setTime(data.settings.time);
                 setEnableWordpress(data.settings.enableWordpress);
+                setUrlWordpress(data.settings.urlWordpress);
                 setUsernameWordpress(data.settings.usernameWordpress);
                 setPasswordWordpress(data.settings.passwordWordpress);
                 setRss(data.settings.rss);
@@ -99,6 +101,10 @@ const Dashboard = function Dashboard() {
                                     </div>
                                 </div>
                             </div>
+                            {enableWordpress && <div className='row col-12 mt-3'>
+                                <label className='form-label' htmlFor='wordpress-username'>Wordpress Url</label>
+                                <div className='col-12'><input type="text" required value={urlWordpress} onChange={(e) => setUrlWordpress(e.target.value)} className='form-control' placeholder='wordpress Url' /></div>
+                            </div>}
                             {enableWordpress && <div className='row col-12 mt-3'>
                                 <label className='form-label' htmlFor='wordpress-username'>Wordpress Api Username</label>
                                 <div className='col-12'><input type="text" required value={usernameWordpress} onChange={(e) => setUsernameWordpress(e.target.value)} className='form-control' placeholder='wordpress api username' /></div>
