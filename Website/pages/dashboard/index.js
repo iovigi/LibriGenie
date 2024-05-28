@@ -14,7 +14,6 @@ const Dashboard = function Dashboard() {
     const [urlWordpress, setUrlWordpress] = useState('');
     const [usernameWordpress, setUsernameWordpress] = useState('');
     const [passwordWordpress, setPasswordWordpress] = useState('');
-    const [rss, setRss] = useState('');
     const [enable, setEnable] = useState(false);
 
     const handleSubmit = async (event) => {
@@ -24,7 +23,7 @@ const Dashboard = function Dashboard() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: "same-origin",
-            body: JSON.stringify({ category, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, rss, enable }),
+            body: JSON.stringify({ category, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, enable }),
         })
 
         if (response.ok) {
@@ -42,14 +41,17 @@ const Dashboard = function Dashboard() {
         })
             .then((res) => res.json())
             .then((data) => {
-                setCategory(data.settings.category);
-                setTime(data.settings.time);
-                setEnableWordpress(data.settings.enableWordpress);
-                setUrlWordpress(data.settings.urlWordpress);
-                setUsernameWordpress(data.settings.usernameWordpress);
-                setPasswordWordpress(data.settings.passwordWordpress);
-                setRss(data.settings.rss);
-                setEnable(data.settings.enable);
+                if (!data.settings) {
+                    return;
+                }
+                
+                setCategory(data.settings?.category);
+                setTime(data.settings?.time);
+                setEnableWordpress(data.settings?.enableWordpress);
+                setUrlWordpress(data.settings?.urlWordpress);
+                setUsernameWordpress(data.settings?.usernameWordpress);
+                setPasswordWordpress(data.settings?.passwordWordpress);
+                setEnable(data.settings?.enable);
             })
     }, [])
 
@@ -88,7 +90,7 @@ const Dashboard = function Dashboard() {
                     <div className='container d-flex justify-content-center align-items-center'>
                         <form className='row w-75' onSubmit={handleSubmit}>
                             <div className='row mt-3 col-12'>
-                                <label className='form-label' htmlFor='time'>Time of the day</label>
+                                <label className='form-label' htmlFor='time'>UTC Time of the day to trigger the generation</label>
                                 <div className='col-12'>
                                     <input required type="time" className='form-control' value={time} onChange={(e) => setTime(e.target.value)} />
                                 </div>
@@ -122,11 +124,6 @@ const Dashboard = function Dashboard() {
                                     <option value="Summarize">Summarize News</option>
                                 </select></div>
                             </div>
-                            {category == "Summarize" &&
-                                <div className='row mt-3'>
-                                    <label className='form-label' htmlFor='rss'>Rss</label>
-                                    <div className='col-12'><input type="url" value={rss} onChange={(e) => setRss(e.target.value)} required className='form-control' placeholder='Enter rss' /></div>
-                                </div>}
                             <div className='row mt-3'>
                                 <div className='col-12'>
                                     <div className='form-check'>
