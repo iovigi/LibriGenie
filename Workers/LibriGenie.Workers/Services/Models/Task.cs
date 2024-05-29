@@ -1,4 +1,4 @@
-﻿namespace LibriGenie.Api.Models;
+﻿namespace LibriGenie.Workers.Services.Models;
 
 public class Task
 {

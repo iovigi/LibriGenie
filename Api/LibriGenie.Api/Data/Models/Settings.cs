@@ -11,6 +11,8 @@ public class Settings
     public TimeSpan Time { get; set; }
     [BsonElement("enableWordpress")]
     public bool EnableWordpress { get; set; }
+    [BsonElement("urlWordpress")]
+    public string? UrlWordpress { get; set; }
     [BsonElement("usernameWordpress")]
     public string? UsernameWordpress { get; set; }
     [BsonElement("passwordWordpress")]

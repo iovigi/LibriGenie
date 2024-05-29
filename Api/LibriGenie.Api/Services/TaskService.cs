@@ -27,6 +27,7 @@ public class TaskService(IMongoDatabase database) : ITaskService
                 EnableWordpress = x.Settings!.EnableWordpress,
                 UsernameWordpress = x.Settings!.UsernameWordpress,
                 PasswordWordpress = x.Settings!.PasswordWordpress,
+                UrlWordpress = x.Settings!.UrlWordpress,
             })
             .ToListAsync(cancellationToken);
     }
