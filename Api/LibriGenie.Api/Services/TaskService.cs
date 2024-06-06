@@ -16,7 +16,7 @@ public class TaskService(IMongoDatabase database) : ITaskService
             .Find(x => x.Settings != null
                 && x.Settings.Enable
                 && (x.Settings.LastRun == null || x.Settings.LastRun.Value.Date != utcNow.Date)
-                && (x.Settings.Time <= timePlusFive && x.Settings.Time >= timeOfDay))
+                && (x.Settings.Time <= timePlusFive))
             .Skip(page * pageSize)
             .Limit(pageSize)
             .Project(x => new Models.Task()
