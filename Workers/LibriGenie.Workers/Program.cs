@@ -6,6 +6,8 @@ using LibriGenie.Workers.Services.ContentGenerate;
 using LibriGenie.Workers.Services.News;
 using OllamaClient.Extensions;
 
+const string SERVICE_NAME = "Libri Genie Worker!";
+
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddSingleton(builder.Configuration.Get<AppSettings>()!);
@@ -24,6 +26,12 @@ builder.Services.AddSingleton<INewClient, NewClient>();
 builder.Services.AddSingleton<IMailService, MailService>();
 builder.Services.AddSingleton<IContentGenerator, ContentGenerator>();
 builder.Services.AddMemoryCache();
+
+builder.Services.AddWindowsService(options =>
+{
+    options.ServiceName = SERVICE_NAME;
+});
+
 
 var host = builder.Build();
 host.Run();

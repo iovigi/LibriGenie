@@ -20,7 +20,7 @@ public class MailService(AppSettings appSettings) : IMailService
 
     private SendSmtpEmail CreateSendSmtpEmail(string to, string subject, string? body, string? html)
     {
-        brevo_csharp.Client.Configuration.Default.ApiKey.Add(API_KEY, appSettings.MailSettings.BrevoApiKey);
+        brevo_csharp.Client.Configuration.Default.ApiKey.TryAdd(API_KEY, appSettings.MailSettings.BrevoApiKey);
         string ApiKey = API_KEY;
 
         string SenderName = NO_REPLY;
