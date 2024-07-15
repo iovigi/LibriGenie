@@ -8,7 +8,9 @@ import { toast } from 'react-hot-toast';
 
 
 const Dashboard = function Dashboard() {
+    const [typeTrigger, setTypeTrigger] = useState(0);
     const [category, setCategory] = useState('');
+    const [cron, setCron] = useState('');
     const [time, setTime] = useState('00:00');
     const [enableWordpress, setEnableWordpress] = useState(false);
     const [urlWordpress, setUrlWordpress] = useState('');
@@ -23,7 +25,7 @@ const Dashboard = function Dashboard() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: "same-origin",
-            body: JSON.stringify({ category, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, enable }),
+            body: JSON.stringify({ category, typeTrigger, cron, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, enable }),
         })
 
         if (response.ok) {
@@ -44,7 +46,7 @@ const Dashboard = function Dashboard() {
                 if (!data.settings) {
                     return;
                 }
-                
+
                 setCategory(data.settings?.category);
                 setTime(data.settings?.time);
                 setEnableWordpress(data.settings?.enableWordpress);
@@ -52,6 +54,8 @@ const Dashboard = function Dashboard() {
                 setUsernameWordpress(data.settings?.usernameWordpress);
                 setPasswordWordpress(data.settings?.passwordWordpress);
                 setEnable(data.settings?.enable);
+                setTypeTrigger(data.settings?.typeTrigger);
+                setCron(data.settings?.cron);
             })
     }, [])
 
@@ -90,11 +94,34 @@ const Dashboard = function Dashboard() {
                     <div className='container d-flex justify-content-center align-items-center'>
                         <form className='row w-75' onSubmit={handleSubmit}>
                             <div className='row mt-3 col-12'>
+                                <label className='form-label' htmlFor='time'>Cron Expression or time of the day to trigger the generation</label>
+                                <div className='col-12'>
+                                    <div class="form-check">
+                                        <input type="radio" name="type-trigger" value="0" defaultChecked checked={typeTrigger == 0} onChange={(e) => setTypeTrigger(e.target.value)} className='form-check-input' />
+                                        <label class="form-check-label" for="0">
+                                            Time of the day to trigger
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="radio" name="type-trigger" value="1" checked={typeTrigger == 1} onChange={(e) => setTypeTrigger(e.target.value)} className='form-check-input' />
+                                        <label class="form-check-label" for="1">
+                                            Cron
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            {typeTrigger == 0 && <div className='row mt-3 col-12'>
                                 <label className='form-label' htmlFor='time'>UTC Time of the day to trigger the generation</label>
                                 <div className='col-12'>
                                     <input required type="time" className='form-control' value={time} onChange={(e) => setTime(e.target.value)} />
                                 </div>
-                            </div>
+                            </div>}
+                            {typeTrigger == 1 && <div className='row mt-3 col-12'>
+                                <label className='form-label' htmlFor='cron'>Cron Expression</label>
+                                <div className='col-12'>
+                                    <input required type="input" className='form-control' value={cron} onChange={(e) => setCron(e.target.value)} />
+                                </div>
+                            </div>}
                             <div className='row mt-3'>
                                 <div className='col-12'>
                                     <div className='form-check'>
