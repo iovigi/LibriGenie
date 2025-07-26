@@ -24,6 +24,14 @@ public class TaskController : ControllerBase
         return Ok(tasks);
     }
 
+    [HttpGet("[action]")]
+    public async Task<IActionResult> GetAllActiveTasks(CancellationToken cancellationToken = default)
+    {
+        var tasks = await taskService.GetAllActiveTasks(cancellationToken);
+        
+        return Ok(tasks);
+    }
+
     [HttpPost("[action]")]
     public async Task<IActionResult> SetLastRun(string id, CancellationToken cancellationToken = default)
     {

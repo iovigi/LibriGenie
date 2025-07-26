@@ -28,6 +28,28 @@ public class TaskService(IMongoDatabase database) : ITaskService
                 UsernameWordpress = x.Settings!.UsernameWordpress,
                 PasswordWordpress = x.Settings!.PasswordWordpress,
                 UrlWordpress = x.Settings!.UrlWordpress,
+                Time = x.Settings!.Time,
+                LastRun = x.Settings!.LastRun,
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IList<Models.Task>> GetAllActiveTasks(CancellationToken cancellationToken)
+    {
+        return await database
+            .GetCollection<User>("users")
+            .Find(x => x.Settings != null && x.Settings.Enable)
+            .Project(x => new Models.Task()
+            {
+                Id = x.Id,
+                Email = x.Email,
+                Category = x.Settings!.Category,
+                EnableWordpress = x.Settings!.EnableWordpress,
+                UsernameWordpress = x.Settings!.UsernameWordpress,
+                PasswordWordpress = x.Settings!.PasswordWordpress,
+                UrlWordpress = x.Settings!.UrlWordpress,
+                Time = x.Settings!.Time,
+                LastRun = x.Settings!.LastRun,
             })
             .ToListAsync(cancellationToken);
     }

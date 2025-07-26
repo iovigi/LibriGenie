@@ -12,6 +12,13 @@ public class LibriGenieClient(HttpClient httpClient, AppSettings appSettings) : 
         return (await httpClient.GetFromJsonAsync<List<Models.Task>>($"{appSettings.ApiConfiguration.Endpoint}Task/GetTasksForRun?page={page}&pageSize={pageSize}", cancellationToken))!;
     }
 
+    public async Task<List<Models.Task>> GetAllActiveTasks(CancellationToken cancellationToken)
+    {
+        httpClient.DefaultRequestHeaders.Authorization = appSettings.ApiConfiguration.GetAuthenticationHeaderValue();
+
+        return (await httpClient.GetFromJsonAsync<List<Models.Task>>($"{appSettings.ApiConfiguration.Endpoint}Task/GetAllActiveTasks", cancellationToken))!;
+    }
+
     public async System.Threading.Tasks.Task SetLastRun(string id, CancellationToken cancellationToken)
     {
         httpClient.DefaultRequestHeaders.Authorization = appSettings.ApiConfiguration.GetAuthenticationHeaderValue();

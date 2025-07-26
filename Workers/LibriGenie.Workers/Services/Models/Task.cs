@@ -9,4 +9,6 @@ public class Task
     public string? UrlWordpress { get; set; }
     public string? UsernameWordpress { get; set; }
     public string? PasswordWordpress { get; set; }
+    public TimeSpan Time { get; set; }
+    public DateTime? LastRun { get; set; }
 }
