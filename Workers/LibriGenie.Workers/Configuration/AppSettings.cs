@@ -9,6 +9,7 @@ public class AppSettings
     public ApiConfiguration ApiConfiguration { get; set; } = new ApiConfiguration();
     public string NewUrl { get; set; } = string.Empty;
     public MailSettings MailSettings { get; set; } = new MailSettings();
+    public DataClientSettings DataClientSettings { get; set; } = new DataClientSettings();
 }
 
 public class OllamaSettings
@@ -36,4 +37,10 @@ public class MailSettings
 {
     public string BrevoApiKey { get; set; }
     public string NoReplyEmail { get; set; }
+}
+
+public class DataClientSettings
+{
+    public string BaseUrl { get; set; } = string.Empty;
+    public string SystemAuthKey { get; set; } = string.Empty;
 }

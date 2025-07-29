@@ -25,6 +25,7 @@ builder.Services.AddSingleton<IWordpressPublisher, WordpressPublisher>();
 builder.Services.AddSingleton<INewClient, NewClient>();
 builder.Services.AddSingleton<IMailService, MailService>();
 builder.Services.AddSingleton<IContentGenerator, ContentGenerator>();
+builder.Services.AddSingleton<IDataClient, DataClient>();
 builder.Services.AddMemoryCache();
 
 builder.Services.AddWindowsService(options =>
