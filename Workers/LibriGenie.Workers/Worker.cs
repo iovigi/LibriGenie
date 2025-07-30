@@ -80,12 +80,21 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             {
                 // Run crypto spike detection
                 Dictionary<string, List<string>> cryptoEvents = new Dictionary<string, List<string>>();
+                Dictionary<string, CryptoMetrics> cryptoMetrics = new Dictionary<string, CryptoMetrics>();
                 try
                 {
-                    cryptoEvents = await cryptoManager.Recalculate();
+                    var result = await cryptoManager.Recalculate();
+                    cryptoEvents = result.Events;
+                    cryptoMetrics = result.Metrics;
+                    
                     if (cryptoEvents.Any())
                     {
                         logger.LogInformation("Crypto spike events detected for {count} symbols", cryptoEvents.Count);
+                    }
+                    
+                    if (cryptoMetrics.Any())
+                    {
+                        logger.LogInformation("Crypto metrics updated for {count} symbols", cryptoMetrics.Count);
                     }
                 }
                 catch (Exception cryptoEx)
@@ -125,7 +134,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                             if (task.Category == "CryptoSpikes")
                             {
                                 // Handle crypto spike tasks
-                                await ProcessCryptoSpikeTask(task, cryptoEvents, stoppingToken);
+                                await ProcessCryptoSpikeTask(task, cryptoEvents, cryptoMetrics, stoppingToken);
                             }
                             else
                             {
@@ -187,50 +196,87 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
         }
     }
 
-    private async Task ProcessCryptoSpikeTask(Services.Models.Task task, Dictionary<string, List<string>> cryptoEvents, CancellationToken stoppingToken)
+    private async Task ProcessCryptoSpikeTask(Services.Models.Task task, Dictionary<string, List<string>> cryptoEvents, Dictionary<string, CryptoMetrics> cryptoMetrics, CancellationToken stoppingToken)
     {
         try
         {
             var relevantEvents = new Dictionary<string, List<string>>();
+            var relevantMetrics = new Dictionary<string, CryptoMetrics>();
             
-            // Check which symbols from the task have events
+            // Check which symbols from the task have events or metrics
             foreach (var symbol in task.Symbols)
             {
                 if (cryptoEvents.ContainsKey(symbol))
                 {
                     relevantEvents[symbol] = cryptoEvents[symbol];
                 }
+                
+                if (cryptoMetrics.ContainsKey(symbol))
+                {
+                    relevantMetrics[symbol] = cryptoMetrics[symbol];
+                }
             }
 
-            if (!relevantEvents.Any())
+            if (!relevantEvents.Any() && !relevantMetrics.Any())
             {
-                logger.LogInformation("No crypto spike events for user {email} symbols", task.Email);
+                logger.LogInformation("No crypto data for user {email} symbols", task.Email);
                 return;
             }
 
-            // Create email content for all relevant events
-            var emailBody = "Crypto Spike Alerts\n\n";
+            // Create email content
+            var emailBody = "Crypto Metrics Report\n\n";
             
-            foreach (var kvp in relevantEvents)
+            // Add events section if there are any
+            if (relevantEvents.Any())
             {
-                var symbol = kvp.Key;
-                var events = kvp.Value;
+                emailBody += "🚨 SPIKE ALERTS DETECTED 🚨\n\n";
                 
-                emailBody += $"Symbol: {symbol}\n";
-                emailBody += "Events Detected:\n";
-                foreach (var evt in events)
+                foreach (var kvp in relevantEvents)
                 {
-                    emailBody += $"  • {evt}\n";
+                    var symbol = kvp.Key;
+                    var events = kvp.Value;
+                    
+                    emailBody += $"Symbol: {symbol}\n";
+                    emailBody += "Events Detected:\n";
+                    foreach (var evt in events)
+                    {
+                        emailBody += $"  • {evt}\n";
+                    }
+                    emailBody += "\n";
                 }
-                emailBody += "\n";
+            }
+            
+            // Add full metrics section for all symbols
+            if (relevantMetrics.Any())
+            {
+                emailBody += "📊 FULL CRYPTO METRICS\n\n";
+                
+                foreach (var kvp in relevantMetrics)
+                {
+                    var symbol = kvp.Key;
+                    var metrics = kvp.Value;
+                    
+                    emailBody += $"Symbol: {symbol}\n";
+                    emailBody += $"Current Price: {metrics.CurrentPrice:F8}\n";
+                    emailBody += $"Daily Average Price: {metrics.AveragePrice:F8} (from {metrics.DailyPriceCount} updates today)\n";
+                    emailBody += $"2-Week Average Min: {metrics.AverageMin:F8}\n";
+                    emailBody += $"2-Week Average Max: {metrics.AverageMax:F8}\n";
+                    emailBody += $"All-Time Absolute Min: {metrics.AbsoluteMin:F8}\n";
+                    emailBody += $"All-Time Absolute Max: {metrics.AbsoluteMax:F8}\n";
+                    emailBody += $"Last Price Update: {metrics.LastPriceUpdate:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += $"Last Average Update: {metrics.LastAverageUpdate:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += "\n";
+                }
             }
 
-            emailBody += "This alert was generated automatically by Libri Genie Crypto Spikes detection system.";
+            emailBody += "This report was generated automatically by Libri Genie Crypto Spikes detection system.";
 
             // Send email
-            await mailService.SendTextFromNoReply(task.Email, "Crypto Spike Alerts", emailBody, stoppingToken);
+            var subject = relevantEvents.Any() ? "Crypto Spike Alerts & Metrics" : "Crypto Metrics Report";
+            await mailService.SendTextFromNoReply(task.Email, subject, emailBody, stoppingToken);
             
-            logger.LogInformation("Sent crypto spike alerts to {email} for {count} symbols", task.Email, relevantEvents.Count);
+            logger.LogInformation("Sent crypto report to {email} for {count} symbols (events: {eventCount}, metrics: {metricCount})", 
+                task.Email, task.Symbols.Count, relevantEvents.Count, relevantMetrics.Count);
         }
         catch (Exception ex)
         {
