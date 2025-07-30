@@ -97,6 +97,18 @@ const Dashboard = function Dashboard() {
         });
     };
 
+    const handleSelectAll = () => {
+        if (symbols.length === availableSymbols.length) {
+            // If all are selected, deselect all
+            setSymbols([]);
+        } else {
+            // If not all are selected, select all
+            setSymbols(availableSymbols.map(symbol => symbol.id));
+        }
+    };
+
+    const isAllSelected = availableSymbols.length > 0 && symbols.length === availableSymbols.length;
+
     return (<>
         <Head>
             <title>Libri Genie</title>
@@ -208,6 +220,17 @@ const Dashboard = function Dashboard() {
                                              </div>
                                          ) : (
                                              <div className="row">
+                                                 {availableSymbols.length > 0 && (
+                                                     <div className="col-12 mb-3">
+                                                         <button
+                                                             type="button"
+                                                             className="btn btn-outline-primary btn-sm"
+                                                             onClick={handleSelectAll}
+                                                         >
+                                                             {isAllSelected ? 'Deselect All' : 'Select All'}
+                                                         </button>
+                                                     </div>
+                                                 )}
                                                  {availableSymbols.map((symbol) => (
                                                      <div key={symbol.id} className="col-md-6 col-lg-4 mb-2">
                                                          <div className="form-check">
