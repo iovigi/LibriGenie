@@ -21,4 +21,6 @@ public class Settings
     public bool Enable { get; set; }
     [BsonElement("lastRun")]
     public DateTime? LastRun { get; set; }
+    [BsonElement("symbols")]
+    public List<string> Symbols { get; set; } = new List<string>();
 }

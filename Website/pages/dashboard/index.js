@@ -17,6 +17,9 @@ const Dashboard = function Dashboard() {
     const [usernameWordpress, setUsernameWordpress] = useState('');
     const [passwordWordpress, setPasswordWordpress] = useState('');
     const [enable, setEnable] = useState(false);
+    const [symbols, setSymbols] = useState([]);
+    const [availableSymbols, setAvailableSymbols] = useState([]);
+    const [loadingSymbols, setLoadingSymbols] = useState(false);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -25,7 +28,7 @@ const Dashboard = function Dashboard() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: "same-origin",
-            body: JSON.stringify({ category, typeTrigger, cron, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, enable }),
+            body: JSON.stringify({ category, typeTrigger, cron, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, enable, symbols }),
         })
 
         if (response.ok) {
@@ -56,8 +59,43 @@ const Dashboard = function Dashboard() {
                 setEnable(data.settings?.enable);
                 setTypeTrigger(data.settings?.typeTrigger);
                 setCron(data.settings?.cron);
+                setSymbols(data.settings?.symbols || []);
             })
     }, [])
+
+    // Fetch crypto symbols when Crypto Spikes category is selected
+    useEffect(() => {
+        if (category === 'CryptoSpikes' && availableSymbols.length === 0) {
+            setLoadingSymbols(true);
+            fetch('/api/crypto/crypto-symbols', {
+                headers: { 'Content-Type': 'application/json' },
+                credentials: "same-origin",
+            })
+                .then((res) => res.json())
+                .then((data) => {
+                    if (data.success) {
+                        setAvailableSymbols(data.symbols);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error fetching symbols:', error);
+                    toast.error("Failed to fetch crypto symbols");
+                })
+                .finally(() => {
+                    setLoadingSymbols(false);
+                });
+        }
+    }, [category, availableSymbols.length]);
+
+    const handleSymbolToggle = (symbolId) => {
+        setSymbols(prev => {
+            if (prev.includes(symbolId)) {
+                return prev.filter(id => id !== symbolId);
+            } else {
+                return [...prev, symbolId];
+            }
+        });
+    };
 
     return (<>
         <Head>
@@ -91,37 +129,51 @@ const Dashboard = function Dashboard() {
                     <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                         <h1 className="h2">Settings</h1>
                     </div>
-                    <div className='container d-flex justify-content-center align-items-center'>
-                        <form className='row w-75' onSubmit={handleSubmit}>
-                            <div className='row mt-3 col-12'>
-                                <label className='form-label' htmlFor='time'>Cron Expression or time of the day to trigger the generation</label>
-                                <div className='col-12'>
-                                    <div class="form-check">
-                                        <input type="radio" name="type-trigger" value="0" defaultChecked checked={typeTrigger == 0} onChange={(e) => setTypeTrigger(e.target.value)} className='form-check-input' />
-                                        <label class="form-check-label" for="0">
-                                            Time of the day to trigger
-                                        </label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="radio" name="type-trigger" value="1" checked={typeTrigger == 1} onChange={(e) => setTypeTrigger(e.target.value)} className='form-check-input' />
-                                        <label class="form-check-label" for="1">
-                                            Cron
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                            {typeTrigger == 0 && <div className='row mt-3 col-12'>
-                                <label className='form-label' htmlFor='time'>UTC Time of the day to trigger the generation</label>
-                                <div className='col-12'>
-                                    <input required type="time" className='form-control' value={time} onChange={(e) => setTime(e.target.value)} />
-                                </div>
-                            </div>}
-                            {typeTrigger == 1 && <div className='row mt-3 col-12'>
-                                <label className='form-label' htmlFor='cron'>Cron Expression</label>
-                                <div className='col-12'>
-                                    <input required type="input" className='form-control' value={cron} onChange={(e) => setCron(e.target.value)} />
-                                </div>
-                            </div>}
+                                         <div className='container d-flex justify-content-center align-items-center'>
+                         <form className='row w-75' onSubmit={handleSubmit}>
+                             <div className='row mt-3'>
+                                 <label className='form-label' htmlFor='category'>Category</label>
+                                 <div className='col-12'> <select className='form-select' value={category} required onChange={(e) => setCategory(e.target.value)}>
+                                     <option disabled value="">Please select category</option>
+                                     <option value="Joke">Joke</option>
+                                     <option value="Poem">Poem</option>
+                                     <option value="Summarize">Summarize News</option>
+                                     <option value="CryptoSpikes">Crypto Spikes</option>
+                                 </select></div>
+                             </div>
+                             
+                             
+                                                           {category !== 'CryptoSpikes' && (
+                                  <div className='row mt-3 col-12'>
+                                      <label className='form-label' htmlFor='time'>Cron Expression or time of the day to trigger the generation</label>
+                                      <div className='col-12'>
+                                          <div class="form-check">
+                                              <input type="radio" name="type-trigger" value="0" defaultChecked checked={typeTrigger == 0} onChange={(e) => setTypeTrigger(e.target.value)} className='form-check-input' />
+                                              <label class="form-check-label" for="0">
+                                                  Time of the day to trigger
+                                              </label>
+                                          </div>
+                                          <div class="form-check">
+                                              <input type="radio" name="type-trigger" value="1" checked={typeTrigger == 1} onChange={(e) => setTypeTrigger(e.target.value)} className='form-check-input' />
+                                              <label class="form-check-label" for="1">
+                                                  Cron
+                                              </label>
+                                          </div>
+                                      </div>
+                                  </div>
+                              )}
+                                                         {category !== 'CryptoSpikes' && typeTrigger == 0 && <div className='row mt-3 col-12'>
+                                 <label className='form-label' htmlFor='time'>UTC Time of the day to trigger the generation</label>
+                                 <div className='col-12'>
+                                     <input required type="time" className='form-control' value={time} onChange={(e) => setTime(e.target.value)} />
+                                 </div>
+                             </div>}
+                             {category !== 'CryptoSpikes' && typeTrigger == 1 && <div className='row mt-3 col-12'>
+                                 <label className='form-label' htmlFor='cron'>Cron Expression</label>
+                                 <div className='col-12'>
+                                     <input required type="input" className='form-control' value={cron} onChange={(e) => setCron(e.target.value)} />
+                                 </div>
+                             </div>}
                             <div className='row mt-3'>
                                 <div className='col-12'>
                                     <div className='form-check'>
@@ -138,32 +190,65 @@ const Dashboard = function Dashboard() {
                                 <label className='form-label' htmlFor='wordpress-username'>Wordpress Api Username</label>
                                 <div className='col-12'><input type="text" required value={usernameWordpress} onChange={(e) => setUsernameWordpress(e.target.value)} className='form-control' placeholder='wordpress api username' /></div>
                             </div>}
-                            {enableWordpress && <div className='row  col-12 mt-3'>
-                                <label className='form-label' htmlFor='wordpress-password'>Wordpress API Password</label>
-                                <div className='col-12'><input type="password" required value={passwordWordpress} onChange={(e) => setPasswordWordpress(e.target.value)} className='form-control' placeholder='wordpress api password' /></div>
-                            </div>}
-                            <div className='row mt-3'>
-                                <label className='form-label' htmlFor='category'>Category</label>
-                                <div className='col-12'> <select className='form-select' value={category} required onChange={(e) => setCategory(e.target.value)}>
-                                    <option disabled value="">Please select category</option>
-                                    <option value="Joke">Joke</option>
-                                    <option value="Poem">Poem</option>
-                                    <option value="Summarize">Summarize News</option>
-                                </select></div>
-                            </div>
-                            <div className='row mt-3'>
-                                <div className='col-12'>
-                                    <div className='form-check'>
-                                        <input name="enable" className='form-check-input' type='checkbox' checked={enable} onChange={(e) => setEnable(e.target.checked)} />
-                                        <label className='form-check-label' htmlFor='enable'>Enable</label>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className='row mt-3'>
-                                <div>
-                                    <button type='submit' className='btn btn-primary w-100'>Save</button>
-                                </div>
-                            </div>
+                                                                                      {enableWordpress && <div className='row  col-12 mt-3'>
+                                 <label className='form-label' htmlFor='wordpress-password'>Wordpress API Password</label>
+                                 <div className='col-12'><input type="password" required value={passwordWordpress} onChange={(e) => setPasswordWordpress(e.target.value)} className='form-control' placeholder='wordpress api password' /></div>
+                             </div>}
+                             
+                             {category === 'CryptoSpikes' && (
+                                 <div className='row mt-3'>
+                                     <label className='form-label'>Select Crypto Symbols</label>
+                                     <div className='col-12'>
+                                         {loadingSymbols ? (
+                                             <div className="text-center">
+                                                 <div className="spinner-border" role="status">
+                                                     <span className="visually-hidden">Loading...</span>
+                                                 </div>
+                                                 <p className="mt-2">Loading crypto symbols...</p>
+                                             </div>
+                                         ) : (
+                                             <div className="row">
+                                                 {availableSymbols.map((symbol) => (
+                                                     <div key={symbol.id} className="col-md-6 col-lg-4 mb-2">
+                                                         <div className="form-check">
+                                                             <input
+                                                                 className="form-check-input"
+                                                                 type="checkbox"
+                                                                 id={symbol.id}
+                                                                 checked={symbols.includes(symbol.id)}
+                                                                 onChange={() => handleSymbolToggle(symbol.id)}
+                                                             />
+                                                             <label className="form-check-label" htmlFor={symbol.id}>
+                                                                 {symbol.display_name} ({symbol.base_currency}/{symbol.quote_currency})
+                                                             </label>
+                                                         </div>
+                                                     </div>
+                                                 ))}
+                                                 {availableSymbols.length === 0 && !loadingSymbols && (
+                                                     <div className="col-12">
+                                                         <p className="text-muted">No symbols available</p>
+                                                     </div>
+                                                 )}
+                                             </div>
+                                         )}
+                                     </div>
+                                 </div>
+                             )}
+                             
+                             <div className='row mt-3'>
+                                 <div className='col-12'>
+                                     <div className='form-check'>
+                                         <input name="enable" className='form-check-input' type='checkbox' checked={enable} onChange={(e) => setEnable(e.target.checked)} />
+                                         <label className='form-check-label' htmlFor='enable'>Enable</label>
+                                     </div>
+                                 </div>
+                             </div>
+                             
+                             <div className='row mt-3'>
+                                 <div>
+                                     <button type='submit' className='btn btn-primary w-100'>Save</button>
+                                 </div>
+                             </div>
                         </form>
                     </div>
                 </main>

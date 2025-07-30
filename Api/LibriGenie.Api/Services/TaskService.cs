@@ -15,8 +15,14 @@ public class TaskService(IMongoDatabase database) : ITaskService
             .GetCollection<User>("users")
             .Find(x => x.Settings != null
                 && x.Settings.Enable
-                && (x.Settings.LastRun == null || x.Settings.LastRun.Value.Date != utcNow.Date)
-                && (x.Settings.Time <= timePlusFive))
+                && (
+                    // For Crypto Spikes, ignore Time and LastRun constraints
+                    x.Settings.Category == "CryptoSpikes" ||
+                    // For other categories, apply normal time constraints
+                    (x.Settings.Category != "CryptoSpikes" 
+                        && (x.Settings.LastRun == null || x.Settings.LastRun.Value.Date != utcNow.Date)
+                        && (x.Settings.Time <= timePlusFive))
+                ))
             .Skip(page * pageSize)
             .Limit(pageSize)
             .Project(x => new Models.Task()
@@ -30,6 +36,7 @@ public class TaskService(IMongoDatabase database) : ITaskService
                 UrlWordpress = x.Settings!.UrlWordpress,
                 Time = x.Settings!.Time,
                 LastRun = x.Settings!.LastRun,
+                Symbols = x.Settings!.Symbols ?? new List<string>(),
             })
             .ToListAsync(cancellationToken);
     }
@@ -50,6 +57,7 @@ public class TaskService(IMongoDatabase database) : ITaskService
                 UrlWordpress = x.Settings!.UrlWordpress,
                 Time = x.Settings!.Time,
                 LastRun = x.Settings!.LastRun,
+                Symbols = x.Settings!.Symbols ?? new List<string>(),
             })
             .ToListAsync(cancellationToken);
     }
