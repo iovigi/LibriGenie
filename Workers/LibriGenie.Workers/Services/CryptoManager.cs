@@ -300,8 +300,9 @@ public class CryptoManager : ICryptoManager
                 var metrics = _cryptoMetrics[symbol];
                 var volume = ticker.Volume;
                 double volumeValue = 0;
+                decimal price = 0;
 
-                if (!string.IsNullOrEmpty(volume) && double.TryParse(volume, out volumeValue) && volumeValue < 1)
+                if (string.IsNullOrEmpty(volume) || !double.TryParse(volume, out volumeValue) || volumeValue < 1 || !decimal.TryParse(ticker.Price, out price))
                 {
                     continue; // Skip if volume is not greater than 1
                 }
@@ -312,13 +313,13 @@ public class CryptoManager : ICryptoManager
                 // Update current price and last price update
                 lock (_lockObject)
                 {
-                    _cryptoMetrics[symbol].CurrentPrice = ticker.Price;
+                    _cryptoMetrics[symbol].CurrentPrice = price;
                     _cryptoMetrics[symbol].Volume = volumeValue;
                     _cryptoMetrics[symbol].LastPriceUpdate = DateTime.UtcNow;
                 }
 
                 // Update average price tracking
-                UpdateAveragePrice(symbol, ticker.Price);
+                UpdateAveragePrice(symbol, price);
 
                 // Check if we need to update 2-week averages (if data is older than 1 day)
                 var shouldUpdateAverages = await ShouldUpdateAverages(symbol);
@@ -332,40 +333,40 @@ public class CryptoManager : ICryptoManager
                 var updatedMetricsForSymbol = _cryptoMetrics[symbol];
 
                 // Check for spike events
-                if (ticker.Price < updatedMetricsForSymbol.AverageMin)
+                if (price < updatedMetricsForSymbol.AverageMin)
                 {
-                    events.Add($"Price {ticker.Price:F8} is below average minimum {updatedMetricsForSymbol.AverageMin:F8}");
+                    events.Add($"Price {price:F8} is below average minimum {updatedMetricsForSymbol.AverageMin:F8}");
                     hasEvents = true;
                 }
 
-                if (ticker.Price > updatedMetricsForSymbol.AverageMax)
+                if (price > updatedMetricsForSymbol.AverageMax)
                 {
-                    events.Add($"Price {ticker.Price:F8} is above average maximum {updatedMetricsForSymbol.AverageMax:F8}");
+                    events.Add($"Price {price:F8} is above average maximum {updatedMetricsForSymbol.AverageMax:F8}");
                     hasEvents = true;
                 }
 
                 // Check for new absolute min/max events (these can happen with current prices)
-                if (ticker.Price < updatedMetricsForSymbol.AbsoluteMin)
+                if (price < updatedMetricsForSymbol.AbsoluteMin)
                 {
-                    events.Add($"Price {ticker.Price:F8} is below absolute minimum {updatedMetricsForSymbol.AbsoluteMin:F8} - NEW ABSOLUTE MIN");
+                    events.Add($"Price {price:F8} is below absolute minimum {updatedMetricsForSymbol.AbsoluteMin:F8} - NEW ABSOLUTE MIN");
                     hasEvents = true;
 
                     // Update the absolute minimum
                     lock (_lockObject)
                     {
-                        _cryptoMetrics[symbol].AbsoluteMin = ticker.Price;
+                        _cryptoMetrics[symbol].AbsoluteMin = price;
                     }
                 }
 
-                if (ticker.Price > updatedMetricsForSymbol.AbsoluteMax)
+                if (price > updatedMetricsForSymbol.AbsoluteMax)
                 {
-                    events.Add($"Price {ticker.Price:F8} is above absolute maximum {updatedMetricsForSymbol.AbsoluteMax:F8} - NEW ABSOLUTE MAX");
+                    events.Add($"Price {price:F8} is above absolute maximum {updatedMetricsForSymbol.AbsoluteMax:F8} - NEW ABSOLUTE MAX");
                     hasEvents = true;
 
                     // Update the absolute maximum
                     lock (_lockObject)
                     {
-                        _cryptoMetrics[symbol].AbsoluteMax = ticker.Price;
+                        _cryptoMetrics[symbol].AbsoluteMax = price;
                     }
                 }
 
@@ -563,7 +564,7 @@ public class CryptoManager : ICryptoManager
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error getting volume for {symbol}: {ex.Message}");
+            _logger.LogError($"Error getting ticker for {symbol}: {ex.Message}");
             return null;
         }
     }
@@ -759,7 +760,7 @@ public class CoinbaseProduct
 public class CoinbaseTicker
 {
     [JsonPropertyName("price")]
-    public decimal Price { get; set; }
+    public string Price { get; set; }
     [JsonPropertyName("volume")]
     public string Volume { get; set; }
 }
