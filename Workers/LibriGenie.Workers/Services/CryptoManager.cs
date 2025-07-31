@@ -277,14 +277,14 @@ public class CryptoManager : ICryptoManager
         }
     }
 
-    public async Task<(Dictionary<string, List<string>> Events, Dictionary<string, CryptoMetrics> Metrics)> Recalculate()
+    public async Task<(Dictionary<string, (List<string> events, decimal score)> Events, Dictionary<string, CryptoMetrics> Metrics)> Recalculate()
     {
         if (!_isInitialized)
         {
             await Initialize();
         }
 
-        var symbolEvents = new Dictionary<string, List<string>>();
+        var symbolEvents = new Dictionary<string, (List<string> events, decimal score)>();
         var updatedMetrics = new Dictionary<string, CryptoMetrics>();
 
         try
@@ -308,6 +308,7 @@ public class CryptoManager : ICryptoManager
                 }
 
                 var events = new List<string>();
+                decimal score = 0;
                 var hasEvents = false;
 
                 // Update current price and last price update
@@ -335,12 +336,14 @@ public class CryptoManager : ICryptoManager
                 // Check for spike events
                 if (price < updatedMetricsForSymbol.AverageMin)
                 {
+                    score += updatedMetricsForSymbol.AverageMin - price;
                     events.Add($"Price {price:F8} is below average minimum {updatedMetricsForSymbol.AverageMin:F8}");
                     hasEvents = true;
                 }
 
                 if (price > updatedMetricsForSymbol.AverageMax)
                 {
+                    score += price - updatedMetricsForSymbol.AverageMax;
                     events.Add($"Price {price:F8} is above average maximum {updatedMetricsForSymbol.AverageMax:F8}");
                     hasEvents = true;
                 }
@@ -348,6 +351,7 @@ public class CryptoManager : ICryptoManager
                 // Check for new absolute min/max events (these can happen with current prices)
                 if (price < updatedMetricsForSymbol.AbsoluteMin)
                 {
+                    score += updatedMetricsForSymbol.AbsoluteMin - price;
                     events.Add($"Price {price:F8} is below absolute minimum {updatedMetricsForSymbol.AbsoluteMin:F8} - NEW ABSOLUTE MIN");
                     hasEvents = true;
 
@@ -360,6 +364,7 @@ public class CryptoManager : ICryptoManager
 
                 if (price > updatedMetricsForSymbol.AbsoluteMax)
                 {
+                    score += price - updatedMetricsForSymbol.AbsoluteMax;
                     events.Add($"Price {price:F8} is above absolute maximum {updatedMetricsForSymbol.AbsoluteMax:F8} - NEW ABSOLUTE MAX");
                     hasEvents = true;
 
@@ -393,7 +398,7 @@ public class CryptoManager : ICryptoManager
 
                 if (hasEvents)
                 {
-                    symbolEvents[symbol] = events;
+                    symbolEvents[symbol] = (events, score);
                 }
             }
 

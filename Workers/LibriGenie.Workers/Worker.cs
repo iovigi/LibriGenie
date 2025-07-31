@@ -12,7 +12,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
         try
         {
             var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "active_tasks.json");
-            
+
             if (!File.Exists(filePath))
             {
                 logger.LogWarning("Backup file active_tasks.json not found");
@@ -44,7 +44,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                 .Take(pageSize)
                 .ToList();
 
-            logger.LogInformation("Retrieved {count} tasks from backup file (page {page}, pageSize {pageSize})", 
+            logger.LogInformation("Retrieved {count} tasks from backup file (page {page}, pageSize {pageSize})",
                 paginatedTasks.Count, page, pageSize);
 
             return paginatedTasks;
@@ -79,19 +79,19 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             try
             {
                 // Run crypto spike detection
-                Dictionary<string, List<string>> cryptoEvents = new Dictionary<string, List<string>>();
+                Dictionary<string, (List<string> events, decimal score)> cryptoEvents = new Dictionary<string, (List<string> events, decimal score)>();
                 Dictionary<string, CryptoMetrics> cryptoMetrics = new Dictionary<string, CryptoMetrics>();
                 try
                 {
                     var result = await cryptoManager.Recalculate();
                     cryptoEvents = result.Events;
                     cryptoMetrics = result.Metrics;
-                    
+
                     if (cryptoEvents.Any())
                     {
                         logger.LogInformation("Crypto spike events detected for {count} symbols", cryptoEvents.Count);
                     }
-                    
+
                     if (cryptoMetrics.Any())
                     {
                         logger.LogInformation("Crypto metrics updated for {count} symbols", cryptoMetrics.Count);
@@ -104,7 +104,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                 int page_size = 100;
                 int page = 0;
                 List<Services.Models.Task> tasks = new List<Services.Models.Task>();
-                
+
                 do
                 {
                     try
@@ -116,10 +116,10 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                     catch (Exception apiEx)
                     {
                         logger.LogWarning(apiEx, "Failed to get tasks from API, using backup file: {message}", apiEx.Message);
-                        
+
                         // Fallback to backup file
                         tasks = GetTasksForRunFromBackup(page, page_size);
-                        
+
                         if (!tasks.Any())
                         {
                             logger.LogWarning("No tasks available from backup file, skipping this cycle");
@@ -170,16 +170,16 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                 try
                 {
                     var allActiveTasks = await libriGenieClient.GetAllActiveTasks(stoppingToken);
-                    var jsonContent = JsonSerializer.Serialize(allActiveTasks, new JsonSerializerOptions 
-                    { 
-                        WriteIndented = true 
+                    var jsonContent = JsonSerializer.Serialize(allActiveTasks, new JsonSerializerOptions
+                    {
+                        WriteIndented = true
                     });
-                    
+
                     var fileName = "active_tasks.json";
                     var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
-                    
+
                     await File.WriteAllTextAsync(filePath, jsonContent, stoppingToken);
-                    
+
                     logger.LogInformation("All active tasks saved to file: {fileName}", fileName);
                 }
                 catch (Exception ex)
@@ -196,13 +196,13 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
         }
     }
 
-    private async Task ProcessCryptoSpikeTask(Services.Models.Task task, Dictionary<string, List<string>> cryptoEvents, Dictionary<string, CryptoMetrics> cryptoMetrics, CancellationToken stoppingToken)
+    private async Task ProcessCryptoSpikeTask(Services.Models.Task task, Dictionary<string, (List<string> events, decimal score)> cryptoEvents, Dictionary<string, CryptoMetrics> cryptoMetrics, CancellationToken stoppingToken)
     {
         try
         {
-            var relevantEvents = new Dictionary<string, List<string>>();
+            var relevantEvents = new Dictionary<string, (List<string> events, decimal score)>();
             var relevantMetrics = new Dictionary<string, CryptoMetrics>();
-            
+
             // Check which symbols from the task have events or metrics
             foreach (var symbol in task.Symbols)
             {
@@ -210,7 +210,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                 {
                     relevantEvents[symbol] = cryptoEvents[symbol];
                 }
-                
+
                 if (cryptoMetrics.ContainsKey(symbol))
                 {
                     relevantMetrics[symbol] = cryptoMetrics[symbol];
@@ -225,38 +225,26 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
 
             // Create email content
             var emailBody = "Crypto Metrics Report\n\n";
-            
+
             // Add events section if there are any
-            if (relevantEvents.Any())
+            if (relevantEvents.Any() && relevantMetrics.Any())
             {
                 emailBody += "🚨 SPIKE ALERTS DETECTED 🚨\n\n";
-                
-                foreach (var kvp in relevantEvents)
+
+                foreach (var kvp in relevantEvents.OrderByDescending(x => x.Value.score))
                 {
                     var symbol = kvp.Key;
-                    var events = kvp.Value;
-                    
+                    var events = kvp.Value.events;
+
                     emailBody += $"Symbol: {symbol}\n";
                     emailBody += "Events Detected:\n";
                     foreach (var evt in events)
                     {
                         emailBody += $"  • {evt}\n";
                     }
-                    emailBody += "\n";
-                }
-            }
-            
-            // Add full metrics section for all symbols
-            if (relevantMetrics.Any())
-            {
-                emailBody += "📊 FULL CRYPTO METRICS\n\n";
-                
-                foreach (var kvp in relevantMetrics)
-                {
-                    var symbol = kvp.Key;
-                    var metrics = kvp.Value;
-                    
-                    emailBody += $"Symbol: {symbol}\n";
+
+                    var metrics = relevantMetrics[symbol];
+                    emailBody += $"Metrics:\n";
                     emailBody += $"Current Price: {metrics.CurrentPrice:F8}\n";
                     emailBody += $"Volume: {metrics.Volume:F8}\n";
                     emailBody += $"Daily Average Price: {metrics.AveragePrice:F8} (from {metrics.DailyPriceCount} updates today)\n";
@@ -275,8 +263,8 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             // Send email
             var subject = relevantEvents.Any() ? "Crypto Spike Alerts & Metrics" : "Crypto Metrics Report";
             await mailService.SendTextFromNoReply(task.Email, subject, emailBody, stoppingToken);
-            
-            logger.LogInformation("Sent crypto report to {email} for {count} symbols (events: {eventCount}, metrics: {metricCount})", 
+
+            logger.LogInformation("Sent crypto report to {email} for {count} symbols (events: {eventCount}, metrics: {metricCount})",
                 task.Email, task.Symbols.Count, relevantEvents.Count, relevantMetrics.Count);
         }
         catch (Exception ex)

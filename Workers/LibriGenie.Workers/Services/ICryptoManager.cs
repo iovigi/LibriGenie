@@ -5,5 +5,5 @@ namespace LibriGenie.Workers.Services;
 public interface ICryptoManager
 {
     System.Threading.Tasks.Task Initialize();
-    Task<(Dictionary<string, List<string>> Events, Dictionary<string, CryptoMetrics> Metrics)> Recalculate();
+    Task<(Dictionary<string, (List<string> events, decimal score)> Events, Dictionary<string, CryptoMetrics> Metrics)> Recalculate();
 } 
