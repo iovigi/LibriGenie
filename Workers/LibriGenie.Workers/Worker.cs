@@ -192,7 +192,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                 logger.LogError(ex, ex.Message);
             }
 
-            await Task.Delay(10000, stoppingToken);
+            await Task.Delay(1000 * 60 * 5, stoppingToken);
         }
     }
 
