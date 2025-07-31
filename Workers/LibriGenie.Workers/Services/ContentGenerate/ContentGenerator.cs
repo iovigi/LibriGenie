@@ -8,12 +8,14 @@ using System.Xml.Serialization;
 
 namespace LibriGenie.Workers.Services.ContentGenerate;
 
-public class ContentGenerator(IOllamaHttpClient ollamaHttpClient, INewClient newClient, IMemoryCache memoryCache, AppSettings appSettings) : IContentGenerator
+public class ContentGenerator(IOllamaHttpClient ollamaHttpClient, INewClient newClient, IMemoryCache memoryCache, AppSettings appSettings, ILogger<ContentGenerator> logger) : IContentGenerator
 {
     private const string END_PROMTH = "Generate Title and content. It should be xml with <GeneratedContent><title></title><content></content></GeneratedContent>, it should be valid xml";
 
     public async Task<GeneratedContent> Generate(string category, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Starting content generation for category: {category}", category);
+        
         string promth = string.Empty;
 
         switch (category)
@@ -29,17 +31,28 @@ public class ContentGenerator(IOllamaHttpClient ollamaHttpClient, INewClient new
                 break;
         }
 
-        var result = await ollamaHttpClient.SendChat(new OllamaClient.Models.ChatRequest()
-        {
-            Model = appSettings.OllamaSettings.Model,
-            Messages = [ new OllamaClient.Models.Message()
-            {
-                Content = promth,
-                Role = "user"
-            } ]
-        }, CancellationToken.None);
+        logger.LogDebug("Generated prompt for category {category}: {prompt}", category, promth);
 
-        return GetContent(result.Message!.Content);
+        try
+        {
+            var result = await ollamaHttpClient.SendChat(new OllamaClient.Models.ChatRequest()
+            {
+                Model = appSettings.OllamaSettings.Model,
+                Messages = [ new OllamaClient.Models.Message()
+                {
+                    Content = promth,
+                    Role = "user"
+                } ]
+            }, CancellationToken.None);
+
+            logger.LogInformation("Successfully generated content for category: {category}", category);
+            return GetContent(result.Message!.Content);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to generate content for category {category}: {message}", category, ex.Message);
+            throw;
+        }
     }
 
     private static string GetJokePromt()
@@ -79,10 +92,22 @@ public class ContentGenerator(IOllamaHttpClient ollamaHttpClient, INewClient new
 
     public GeneratedContent GetContent(string xml)
     {
-        var xmlS = new XmlSerializer(typeof(GeneratedContent));
+        logger.LogDebug("Parsing XML content: {xml}", xml);
+        
+        try
+        {
+            var xmlS = new XmlSerializer(typeof(GeneratedContent));
 
-        using StringReader reader = new(xml);
+            using StringReader reader = new(xml);
 
-        return (GeneratedContent)xmlS.Deserialize(reader)!;
+            var result = (GeneratedContent)xmlS.Deserialize(reader)!;
+            logger.LogDebug("Successfully parsed XML content with title: {title}", result.Title);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to parse XML content: {message}", ex.Message);
+            throw;
+        }
     }
 }

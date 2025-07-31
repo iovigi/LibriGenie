@@ -35,7 +35,7 @@ public class CryptoManager : ICryptoManager
     private readonly HttpClient _httpClient;
     private readonly ILogger<CryptoManager> _logger;
     private readonly string _stateFilePath;
-    
+
     // Static data storage for crypto metrics
     private static Dictionary<string, CryptoMetrics> _cryptoMetrics = new();
     private static readonly object _lockObject = new();
@@ -46,7 +46,7 @@ public class CryptoManager : ICryptoManager
         _httpClient = httpClient;
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("LibriGenie/1.0");
         _logger = logger;
-        
+
         // Set state file path in the application directory
         var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
         _stateFilePath = Path.Combine(appDirectory, "crypto_state.json");
@@ -67,10 +67,10 @@ public class CryptoManager : ICryptoManager
             if (await LoadState())
             {
                 _logger.LogInformation($"CryptoManager initialized with {_cryptoMetrics.Count} symbols from saved state");
-                
+
                 // Check if we need to refresh data to ensure current 2-week coverage
                 await RefreshDataIfNeeded();
-                
+
                 lock (_lockObject)
                 {
                     _isInitialized = true;
@@ -93,15 +93,15 @@ public class CryptoManager : ICryptoManager
         // Get all products from Coinbase
         var response = await _httpClient.GetAsync("https://api.exchange.coinbase.com/products");
         response.EnsureSuccessStatusCode();
-        
+
         var productsJson = await response.Content.ReadAsStringAsync();
         var products = JsonSerializer.Deserialize<List<CoinbaseProduct>>(productsJson);
 
         if (products == null) return;
 
         // Filter for USD and EUR pairs
-        var usdEurProducts = products.Where(p => 
-            p.Status == "online" && 
+        var usdEurProducts = products.Where(p =>
+            p.Status == "online" &&
             (p.QuoteCurrency == "USD" || p.QuoteCurrency == "EUR")).ToList();
 
         foreach (var product in usdEurProducts)
@@ -149,7 +149,7 @@ public class CryptoManager : ICryptoManager
 
             var oldestUpdate = _cryptoMetrics.Values.Min(m => m.LastUpdated);
             var newestUpdate = _cryptoMetrics.Values.Max(m => m.LastUpdated);
-            
+
             _logger.LogInformation($"Successfully loaded crypto state for {_cryptoMetrics.Count} symbols. Data range: {oldestUpdate:yyyy-MM-dd HH:mm:ss} to {newestUpdate:yyyy-MM-dd HH:mm:ss}");
 
             // Check if we need to fill gaps in the data
@@ -174,7 +174,7 @@ public class CryptoManager : ICryptoManager
         try
         {
             _logger.LogInformation("Starting to fill data gaps for 2-week coverage...");
-            
+
             var twoWeeksAgo = DateTime.UtcNow.AddDays(-14);
             var symbols = _cryptoMetrics.Keys.ToList();
             var symbolsToUpdate = new List<string>();
@@ -218,17 +218,17 @@ public class CryptoManager : ICryptoManager
         try
         {
             Dictionary<string, CryptoMetrics> metricsToSave;
-            
+
             lock (_lockObject)
             {
                 metricsToSave = new Dictionary<string, CryptoMetrics>(_cryptoMetrics);
             }
 
-            var jsonContent = JsonSerializer.Serialize(metricsToSave, new JsonSerializerOptions 
-            { 
-                WriteIndented = true 
+            var jsonContent = JsonSerializer.Serialize(metricsToSave, new JsonSerializerOptions
+            {
+                WriteIndented = true
             });
-            
+
             await File.WriteAllTextAsync(_stateFilePath, jsonContent);
             _logger.LogInformation($"Successfully saved crypto state for {metricsToSave.Count} symbols");
         }
@@ -291,16 +291,20 @@ public class CryptoManager : ICryptoManager
         {
             // Get current prices for all tracked symbols
             var symbols = _cryptoMetrics.Keys.ToList();
-            
+
             foreach (var symbol in symbols)
             {
-                var currentPrice = await GetCurrentPrice(symbol);
-                if (currentPrice == null) continue;
+                var ticker = await GetCurrentTicker(symbol);
+                if (ticker == null) continue;
 
                 var metrics = _cryptoMetrics[symbol];
-                var volume = await GetCurrentVolume(symbol);
-                
-                if (volume <= 1) continue; // Skip if volume is not greater than 1
+                var volume = ticker.Volume;
+                double volumeValue = 0;
+
+                if (!string.IsNullOrEmpty(volume) && double.TryParse(volume, out volumeValue) && volumeValue < 1)
+                {
+                    continue; // Skip if volume is not greater than 1
+                }
 
                 var events = new List<string>();
                 var hasEvents = false;
@@ -308,12 +312,13 @@ public class CryptoManager : ICryptoManager
                 // Update current price and last price update
                 lock (_lockObject)
                 {
-                    _cryptoMetrics[symbol].CurrentPrice = currentPrice.Value;
+                    _cryptoMetrics[symbol].CurrentPrice = ticker.Price;
+                    _cryptoMetrics[symbol].Volume = volumeValue;
                     _cryptoMetrics[symbol].LastPriceUpdate = DateTime.UtcNow;
                 }
 
                 // Update average price tracking
-                UpdateAveragePrice(symbol, currentPrice.Value);
+                UpdateAveragePrice(symbol, ticker.Price);
 
                 // Check if we need to update 2-week averages (if data is older than 1 day)
                 var shouldUpdateAverages = await ShouldUpdateAverages(symbol);
@@ -327,40 +332,40 @@ public class CryptoManager : ICryptoManager
                 var updatedMetricsForSymbol = _cryptoMetrics[symbol];
 
                 // Check for spike events
-                if (currentPrice < updatedMetricsForSymbol.AverageMin)
+                if (ticker.Price < updatedMetricsForSymbol.AverageMin)
                 {
-                    events.Add($"Price {currentPrice:F8} is below average minimum {updatedMetricsForSymbol.AverageMin:F8}");
+                    events.Add($"Price {ticker.Price:F8} is below average minimum {updatedMetricsForSymbol.AverageMin:F8}");
                     hasEvents = true;
                 }
-                
-                if (currentPrice > updatedMetricsForSymbol.AverageMax)
+
+                if (ticker.Price > updatedMetricsForSymbol.AverageMax)
                 {
-                    events.Add($"Price {currentPrice:F8} is above average maximum {updatedMetricsForSymbol.AverageMax:F8}");
+                    events.Add($"Price {ticker.Price:F8} is above average maximum {updatedMetricsForSymbol.AverageMax:F8}");
                     hasEvents = true;
                 }
 
                 // Check for new absolute min/max events (these can happen with current prices)
-                if (currentPrice < updatedMetricsForSymbol.AbsoluteMin)
+                if (ticker.Price < updatedMetricsForSymbol.AbsoluteMin)
                 {
-                    events.Add($"Price {currentPrice:F8} is below absolute minimum {updatedMetricsForSymbol.AbsoluteMin:F8} - NEW ABSOLUTE MIN");
+                    events.Add($"Price {ticker.Price:F8} is below absolute minimum {updatedMetricsForSymbol.AbsoluteMin:F8} - NEW ABSOLUTE MIN");
                     hasEvents = true;
-                    
+
                     // Update the absolute minimum
                     lock (_lockObject)
                     {
-                        _cryptoMetrics[symbol].AbsoluteMin = currentPrice.Value;
+                        _cryptoMetrics[symbol].AbsoluteMin = ticker.Price;
                     }
                 }
 
-                if (currentPrice > updatedMetricsForSymbol.AbsoluteMax)
+                if (ticker.Price > updatedMetricsForSymbol.AbsoluteMax)
                 {
-                    events.Add($"Price {currentPrice:F8} is above absolute maximum {updatedMetricsForSymbol.AbsoluteMax:F8} - NEW ABSOLUTE MAX");
+                    events.Add($"Price {ticker.Price:F8} is above absolute maximum {updatedMetricsForSymbol.AbsoluteMax:F8} - NEW ABSOLUTE MAX");
                     hasEvents = true;
-                    
+
                     // Update the absolute maximum
                     lock (_lockObject)
                     {
-                        _cryptoMetrics[symbol].AbsoluteMax = currentPrice.Value;
+                        _cryptoMetrics[symbol].AbsoluteMax = ticker.Price;
                     }
                 }
 
@@ -376,6 +381,7 @@ public class CryptoManager : ICryptoManager
                         AbsoluteMax = _cryptoMetrics[symbol].AbsoluteMax,
                         LastUpdated = _cryptoMetrics[symbol].LastUpdated,
                         CurrentPrice = _cryptoMetrics[symbol].CurrentPrice,
+                        Volume = _cryptoMetrics[symbol].Volume,
                         AveragePrice = _cryptoMetrics[symbol].AveragePrice,
                         LastPriceUpdate = _cryptoMetrics[symbol].LastPriceUpdate,
                         LastAverageUpdate = _cryptoMetrics[symbol].LastAverageUpdate,
@@ -505,11 +511,11 @@ public class CryptoManager : ICryptoManager
                 if (_cryptoMetrics.ContainsKey(symbol))
                 {
                     var existingMetrics = _cryptoMetrics[symbol];
-                    
+
                     // Preserve existing absolute min/max values (they should only be updated by current price events)
                     absoluteMin = existingMetrics.AbsoluteMin;
                     absoluteMax = existingMetrics.AbsoluteMax;
-                    
+
                     _logger.LogInformation($"Preserved absolute min/max for {symbol}: {absoluteMin:F8} - {absoluteMax:F8} (2-week range: {allPrices.Min():F8} - {allPrices.Max():F8})");
                 }
             }
@@ -523,6 +529,7 @@ public class CryptoManager : ICryptoManager
                 AbsoluteMax = absoluteMax,
                 LastUpdated = DateTime.UtcNow,
                 CurrentPrice = 0,
+                Volume = 0,
                 AveragePrice = 0,
                 LastPriceUpdate = DateTime.UtcNow,
                 LastAverageUpdate = DateTime.UtcNow,
@@ -543,41 +550,21 @@ public class CryptoManager : ICryptoManager
         }
     }
 
-    private async Task<decimal?> GetCurrentPrice(string symbol)
+    private async Task<CoinbaseTicker?> GetCurrentTicker(string symbol)
     {
         try
         {
             var response = await _httpClient.GetAsync($"https://api.exchange.coinbase.com/products/{symbol}/ticker");
             response.EnsureSuccessStatusCode();
-            
-            var tickerJson = await response.Content.ReadAsStringAsync();
-            var ticker = JsonSerializer.Deserialize<CoinbaseTicker>(tickerJson);
-            
-            return ticker?.Price;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error getting current price for {symbol}: {ex.Message}");
-            return null;
-        }
-    }
 
-    private async Task<decimal> GetCurrentVolume(string symbol)
-    {
-        try
-        {
-            var response = await _httpClient.GetAsync($"https://api.exchange.coinbase.com/products/{symbol}/ticker");
-            response.EnsureSuccessStatusCode();
-            
             var tickerJson = await response.Content.ReadAsStringAsync();
-            var ticker = JsonSerializer.Deserialize<CoinbaseTicker>(tickerJson);
-            
-            return ticker?.Volume ?? 0;
+
+            return JsonSerializer.Deserialize<CoinbaseTicker>(tickerJson);
         }
         catch (Exception ex)
         {
             _logger.LogError($"Error getting volume for {symbol}: {ex.Message}");
-            return 0;
+            return null;
         }
     }
 
@@ -628,7 +615,7 @@ public class CryptoManager : ICryptoManager
             {
                 var metrics = _cryptoMetrics[symbol];
                 var oneDayAgo = DateTime.UtcNow.AddDays(-1);
-                
+
                 // Update averages if the last update was more than 1 day ago
                 return metrics.LastUpdated < oneDayAgo;
             }
@@ -749,9 +736,9 @@ public class CryptoMetrics
     public decimal AbsoluteMin { get; set; }
     public decimal AbsoluteMax { get; set; }
     public DateTime LastUpdated { get; set; }
-    
     // New fields for average price tracking
     public decimal CurrentPrice { get; set; }
+    public double Volume { get; set; }
     public decimal AveragePrice { get; set; }
     public DateTime LastPriceUpdate { get; set; }
     public DateTime LastAverageUpdate { get; set; }
@@ -771,6 +758,8 @@ public class CoinbaseProduct
 
 public class CoinbaseTicker
 {
-    public decimal? Price { get; set; }
-    public decimal? Volume { get; set; }
-} 
+    [JsonPropertyName("price")]
+    public decimal Price { get; set; }
+    [JsonPropertyName("volume")]
+    public string Volume { get; set; }
+}

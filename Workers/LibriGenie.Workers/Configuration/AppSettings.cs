@@ -10,6 +10,7 @@ public class AppSettings
     public string NewUrl { get; set; } = string.Empty;
     public MailSettings MailSettings { get; set; } = new MailSettings();
     public DataClientSettings DataClientSettings { get; set; } = new DataClientSettings();
+    public string LogFile { get; set; } = string.Empty;
 }
 
 public class OllamaSettings

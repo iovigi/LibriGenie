@@ -5,10 +5,26 @@ using LibriGenie.Workers.Services.Brevo;
 using LibriGenie.Workers.Services.ContentGenerate;
 using LibriGenie.Workers.Services.News;
 using OllamaClient.Extensions;
+using Microsoft.Extensions.Logging;
 
 const string SERVICE_NAME = "Libri Genie Worker!";
 
 var builder = Host.CreateApplicationBuilder(args);
+
+// Configure logging to write to file
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddSimpleConsole(options =>
+{
+    options.SingleLine = true;
+    options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+});
+
+var appSettings = builder.Configuration.Get<AppSettings>()!;
+
+// Add file logging
+builder.Logging.AddProvider(new FileLoggerProvider(appSettings.LogFile));
+
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddSingleton(builder.Configuration.Get<AppSettings>()!);
 builder.Services.AddHttpClient<WordpressPublisher>();
@@ -19,7 +35,7 @@ builder.Services.AddHttpClient<LibriGenieClient>((sp, client) =>
     client.BaseAddress = new Uri(settings.ApiConfiguration.Endpoint);
 });
 
-builder.Services.AddOllamaClient(x=> x.OllamaEndpoint = builder.Configuration.Get<AppSettings>()!.OllamaSettings.OllamaEndpoint);
+builder.Services.AddOllamaClient(x => x.OllamaEndpoint = builder.Configuration.Get<AppSettings>()!.OllamaSettings.OllamaEndpoint);
 builder.Services.AddSingleton<ILibriGenieClient, LibriGenieClient>();
 builder.Services.AddSingleton<IWordpressPublisher, WordpressPublisher>();
 builder.Services.AddSingleton<INewClient, NewClient>();

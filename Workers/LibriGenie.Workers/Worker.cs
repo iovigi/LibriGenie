@@ -258,6 +258,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                     
                     emailBody += $"Symbol: {symbol}\n";
                     emailBody += $"Current Price: {metrics.CurrentPrice:F8}\n";
+                    emailBody += $"Volume: {metrics.Volume:F8}\n";
                     emailBody += $"Daily Average Price: {metrics.AveragePrice:F8} (from {metrics.DailyPriceCount} updates today)\n";
                     emailBody += $"2-Week Average Min: {metrics.AverageMin:F8}\n";
                     emailBody += $"2-Week Average Max: {metrics.AverageMax:F8}\n";
