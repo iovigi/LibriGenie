@@ -248,10 +248,14 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                     emailBody += $"Current Price: {metrics.CurrentPrice:F8}\n";
                     emailBody += $"Volume: {metrics.Volume:F8}\n";
                     emailBody += $"Daily Average Price: {metrics.AveragePrice:F8} (from {metrics.DailyPriceCount} updates today)\n";
+                    emailBody += $"Daily Price Sum: {metrics.DailyPriceSum:F8}\n";
                     emailBody += $"2-Week Average Min: {metrics.AverageMin:F8}\n";
                     emailBody += $"2-Week Average Max: {metrics.AverageMax:F8}\n";
                     emailBody += $"All-Time Absolute Min: {metrics.AbsoluteMin:F8}\n";
                     emailBody += $"All-Time Absolute Max: {metrics.AbsoluteMax:F8}\n";
+                    emailBody += $"Stored Below Avg Min Threshold: {(metrics.StoredBelowAvgMinThreshold.HasValue ? metrics.StoredBelowAvgMinThreshold.Value.ToString("F8") : "None")}\n";
+                    emailBody += $"Stored Above Avg Max Threshold: {(metrics.StoredAboveAvgMaxThreshold.HasValue ? metrics.StoredAboveAvgMaxThreshold.Value.ToString("F8") : "None")}\n";
+                    emailBody += $"Last Updated: {metrics.LastUpdated:yyyy-MM-dd HH:mm:ss} UTC\n";
                     emailBody += $"Last Price Update: {metrics.LastPriceUpdate:yyyy-MM-dd HH:mm:ss} UTC\n";
                     emailBody += $"Last Average Update: {metrics.LastAverageUpdate:yyyy-MM-dd HH:mm:ss} UTC\n";
                     emailBody += "\n";

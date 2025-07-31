@@ -333,19 +333,83 @@ public class CryptoManager : ICryptoManager
                 // Get updated metrics after potential average updates
                 var updatedMetricsForSymbol = _cryptoMetrics[symbol];
 
-                // Check for spike events
+                // Check for spike events with threshold tracking
+                // Below average minimum logic
                 if (price < updatedMetricsForSymbol.AverageMin)
                 {
-                    score += updatedMetricsForSymbol.AverageMin - price;
-                    events.Add($"Price {price:F8} is below average minimum {updatedMetricsForSymbol.AverageMin:F8}");
-                    hasEvents = true;
+                    // If no stored threshold, set it and trigger event
+                    if (!updatedMetricsForSymbol.StoredBelowAvgMinThreshold.HasValue)
+                    {
+                        lock (_lockObject)
+                        {
+                            _cryptoMetrics[symbol].StoredBelowAvgMinThreshold = price;
+                        }
+                        score += updatedMetricsForSymbol.AverageMin - price;
+                        events.Add($"Price {price:F8} is below average minimum {updatedMetricsForSymbol.AverageMin:F8} - NEW THRESHOLD SET");
+                        hasEvents = true;
+                    }
+                    // If price goes below the stored threshold, trigger new event
+                    else if (price < updatedMetricsForSymbol.StoredBelowAvgMinThreshold.Value)
+                    {
+                        lock (_lockObject)
+                        {
+                            _cryptoMetrics[symbol].StoredBelowAvgMinThreshold = price;
+                        }
+                        score += updatedMetricsForSymbol.StoredBelowAvgMinThreshold.Value - price;
+                        events.Add($"Price {price:F8} went below stored threshold {updatedMetricsForSymbol.StoredBelowAvgMinThreshold.Value:F8} - NEW LOW");
+                        hasEvents = true;
+                    }
+                }
+                else
+                {
+                    // Reset stored threshold when price is above average minimum
+                    if (updatedMetricsForSymbol.StoredBelowAvgMinThreshold.HasValue)
+                    {
+                        lock (_lockObject)
+                        {
+                            _cryptoMetrics[symbol].StoredBelowAvgMinThreshold = null;
+                        }
+                        _logger.LogDebug($"Reset below average minimum threshold for {symbol} - price {price:F8} is above average minimum {updatedMetricsForSymbol.AverageMin:F8}");
+                    }
                 }
 
+                // Above average maximum logic
                 if (price > updatedMetricsForSymbol.AverageMax)
                 {
-                    score += price - updatedMetricsForSymbol.AverageMax;
-                    events.Add($"Price {price:F8} is above average maximum {updatedMetricsForSymbol.AverageMax:F8}");
-                    hasEvents = true;
+                    // If no stored threshold, set it and trigger event
+                    if (!updatedMetricsForSymbol.StoredAboveAvgMaxThreshold.HasValue)
+                    {
+                        lock (_lockObject)
+                        {
+                            _cryptoMetrics[symbol].StoredAboveAvgMaxThreshold = price;
+                        }
+                        score += price - updatedMetricsForSymbol.AverageMax;
+                        events.Add($"Price {price:F8} is above average maximum {updatedMetricsForSymbol.AverageMax:F8} - NEW THRESHOLD SET");
+                        hasEvents = true;
+                    }
+                    // If price goes above the stored threshold, trigger new event
+                    else if (price > updatedMetricsForSymbol.StoredAboveAvgMaxThreshold.Value)
+                    {
+                        lock (_lockObject)
+                        {
+                            _cryptoMetrics[symbol].StoredAboveAvgMaxThreshold = price;
+                        }
+                        score += price - updatedMetricsForSymbol.StoredAboveAvgMaxThreshold.Value;
+                        events.Add($"Price {price:F8} went above stored threshold {updatedMetricsForSymbol.StoredAboveAvgMaxThreshold.Value:F8} - NEW HIGH");
+                        hasEvents = true;
+                    }
+                }
+                else
+                {
+                    // Reset stored threshold when price is below average maximum
+                    if (updatedMetricsForSymbol.StoredAboveAvgMaxThreshold.HasValue)
+                    {
+                        lock (_lockObject)
+                        {
+                            _cryptoMetrics[symbol].StoredAboveAvgMaxThreshold = null;
+                        }
+                        _logger.LogDebug($"Reset above average maximum threshold for {symbol} - price {price:F8} is below average maximum {updatedMetricsForSymbol.AverageMax:F8}");
+                    }
                 }
 
                 // Check for new absolute min/max events (these can happen with current prices)
@@ -392,7 +456,9 @@ public class CryptoManager : ICryptoManager
                         LastPriceUpdate = _cryptoMetrics[symbol].LastPriceUpdate,
                         LastAverageUpdate = _cryptoMetrics[symbol].LastAverageUpdate,
                         DailyPriceCount = _cryptoMetrics[symbol].DailyPriceCount,
-                        DailyPriceSum = _cryptoMetrics[symbol].DailyPriceSum
+                        DailyPriceSum = _cryptoMetrics[symbol].DailyPriceSum,
+                        StoredBelowAvgMinThreshold = _cryptoMetrics[symbol].StoredBelowAvgMinThreshold,
+                        StoredAboveAvgMaxThreshold = _cryptoMetrics[symbol].StoredAboveAvgMaxThreshold
                     };
                 }
 
@@ -540,7 +606,9 @@ public class CryptoManager : ICryptoManager
                 LastPriceUpdate = DateTime.UtcNow,
                 LastAverageUpdate = DateTime.UtcNow,
                 DailyPriceCount = 0,
-                DailyPriceSum = 0
+                DailyPriceSum = 0,
+                StoredBelowAvgMinThreshold = null,
+                StoredAboveAvgMaxThreshold = null
             };
 
             lock (_lockObject)
@@ -750,6 +818,9 @@ public class CryptoMetrics
     public DateTime LastAverageUpdate { get; set; }
     public int DailyPriceCount { get; set; }
     public decimal DailyPriceSum { get; set; }
+    // New fields for threshold tracking
+    public decimal? StoredBelowAvgMinThreshold { get; set; }
+    public decimal? StoredAboveAvgMaxThreshold { get; set; }
 }
 
 public class CoinbaseProduct
