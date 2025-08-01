@@ -217,17 +217,25 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                 }
             }
 
-            if (!relevantEvents.Any() && !relevantMetrics.Any())
+            // Only include symbols that have events in the email
+            var symbolsWithEvents = relevantEvents.Keys.ToList();
+            
+            if (!symbolsWithEvents.Any())
             {
-                logger.LogInformation("No crypto data for user {email} symbols", task.Email);
+                logger.LogInformation("No symbols with events for user {email}, skipping email", task.Email);
                 return;
             }
+
+            // Filter metrics to only include symbols that have events
+            var filteredMetrics = relevantMetrics
+                .Where(x => symbolsWithEvents.Contains(x.Key))
+                .ToDictionary(x => x.Key, x => x.Value);
 
             // Create email content
             var emailBody = "Crypto Metrics Report\n\n";
 
             // Section 1: Primary Symbols (symbols marked as primary)
-            var primarySymbols = relevantMetrics
+            var primarySymbols = filteredMetrics
                 .Where(x => task.PrimarySymbols.Contains(x.Key))
                 .OrderByDescending(x => relevantEvents.ContainsKey(x.Key) ? relevantEvents[x.Key].score : 0)
                 .ToList();
@@ -276,7 +284,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             }
 
             // Section 2: Most Volatile Symbols (top 10 by volatility count)
-            var mostVolatileSymbols = relevantMetrics
+            var mostVolatileSymbols = filteredMetrics
                 .Where(x => x.Value.DailyVolatilityCount > 0)
                 .OrderByDescending(x => x.Value.DailyVolatilityCount)
                 .Take(10)
@@ -326,7 +334,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             }
 
             // Section 3: Biggest Price Change (top 10 by daily price change)
-            var biggestPriceChangeSymbols = relevantMetrics
+            var biggestPriceChangeSymbols = filteredMetrics
                 .Where(x => x.Value.DailyPriceChange > 0)
                 .OrderByDescending(x => x.Value.DailyPriceChange)
                 .Take(10)
@@ -376,7 +384,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             }
 
             // Section 4: Rest of Symbols (sorted by score)
-            var restSymbols = relevantMetrics
+            var restSymbols = filteredMetrics
                 .Where(x => !task.PrimarySymbols.Contains(x.Key) && 
                            !mostVolatileSymbols.Any(v => v.Key == x.Key) && 
                            !biggestPriceChangeSymbols.Any(b => b.Key == x.Key))
@@ -429,11 +437,11 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             emailBody += "This report was generated automatically by Libri Genie Crypto Spikes detection system.";
 
             // Send email
-            var subject = relevantEvents.Any() ? "Crypto Spike Alerts & Metrics" : "Crypto Metrics Report";
+            var subject = "Crypto Spike Alerts & Metrics";
             await mailService.SendTextFromNoReply(task.Email, subject, emailBody, stoppingToken);
 
-            logger.LogInformation("Sent crypto report to {email} for {count} symbols (events: {eventCount}, metrics: {metricCount})",
-                task.Email, task.Symbols.Count, relevantEvents.Count, relevantMetrics.Count);
+            logger.LogInformation("Sent crypto report to {email} for {count} symbols with events (total symbols: {totalSymbols})",
+                task.Email, symbolsWithEvents.Count, task.Symbols.Count);
         }
         catch (Exception ex)
         {
