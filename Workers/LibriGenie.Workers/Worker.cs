@@ -283,7 +283,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             }
 
             // Section 2: Most Volatile Symbols (top 10 by volatility count)
-            var mostVolatileSymbols = filteredMetrics
+            var mostVolatileSymbols = relevantMetrics
                 .Where(x => x.Value.DailyVolatilityCount > 0)
                 .OrderByDescending(x => x.Value.DailyVolatilityCount)
                 .Take(10)
@@ -333,7 +333,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             }
 
             // Section 3: Biggest Price Change (top 10 by daily price change)
-            var biggestPriceChangeSymbols = filteredMetrics
+            var biggestPriceChangeSymbols = relevantMetrics
                 .Where(x => x.Value.DailyPriceChange > 0)
                 .OrderByDescending(x => x.Value.DailyPriceChange)
                 .Take(10)
