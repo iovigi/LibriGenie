@@ -23,4 +23,6 @@ public class Settings
     public DateTime? LastRun { get; set; }
     [BsonElement("symbols")]
     public List<string> Symbols { get; set; } = new List<string>();
+    [BsonElement("primarySymbols")]
+    public List<string> PrimarySymbols { get; set; } = new List<string>();
 }

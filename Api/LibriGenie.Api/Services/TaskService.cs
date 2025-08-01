@@ -37,6 +37,7 @@ public class TaskService(IMongoDatabase database) : ITaskService
                 Time = x.Settings!.Time,
                 LastRun = x.Settings!.LastRun,
                 Symbols = x.Settings!.Symbols ?? new List<string>(),
+                PrimarySymbols = x.Settings!.PrimarySymbols ?? new List<string>(),
             })
             .ToListAsync(cancellationToken);
     }
@@ -58,6 +59,7 @@ public class TaskService(IMongoDatabase database) : ITaskService
                 Time = x.Settings!.Time,
                 LastRun = x.Settings!.LastRun,
                 Symbols = x.Settings!.Symbols ?? new List<string>(),
+                PrimarySymbols = x.Settings!.PrimarySymbols ?? new List<string>(),
             })
             .ToListAsync(cancellationToken);
     }

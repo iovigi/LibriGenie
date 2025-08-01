@@ -226,29 +226,193 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             // Create email content
             var emailBody = "Crypto Metrics Report\n\n";
 
-            // Add events section if there are any
-            if (relevantEvents.Any() && relevantMetrics.Any())
-            {
-                emailBody += "🚨 SPIKE ALERTS DETECTED 🚨\n\n";
+            // Section 1: Primary Symbols (symbols marked as primary)
+            var primarySymbols = relevantMetrics
+                .Where(x => task.PrimarySymbols.Contains(x.Key))
+                .OrderByDescending(x => relevantEvents.ContainsKey(x.Key) ? relevantEvents[x.Key].score : 0)
+                .ToList();
 
-                foreach (var kvp in relevantEvents.OrderByDescending(x => x.Value.score))
+            if (primarySymbols.Any())
+            {
+                emailBody += "⭐ PRIMARY SYMBOLS ⭐\n";
+                emailBody += "===================\n\n";
+
+                foreach (var kvp in primarySymbols)
                 {
                     var symbol = kvp.Key;
-                    var events = kvp.Value.events;
+                    var metrics = kvp.Value;
+                    var hasEvents = relevantEvents.ContainsKey(symbol);
+                    var events = hasEvents ? relevantEvents[symbol].events : new List<string>();
+                    var score = hasEvents ? relevantEvents[symbol].score : 0;
 
                     emailBody += $"Symbol: {symbol}\n";
-                    emailBody += "Events Detected:\n";
-                    foreach (var evt in events)
+                    if (hasEvents)
                     {
-                        emailBody += $"  • {evt}\n";
+                        emailBody += $"Score: {score:F2}\n";
+                        emailBody += "Events Detected:\n";
+                        foreach (var evt in events)
+                        {
+                            emailBody += $"  • {evt}\n";
+                        }
                     }
-
-                    var metrics = relevantMetrics[symbol];
-                    emailBody += $"Metrics:\n";
                     emailBody += $"Current Price: {metrics.CurrentPrice:F8}\n";
                     emailBody += $"Volume: {metrics.Volume:F8}\n";
                     emailBody += $"Daily Average Price: {metrics.AveragePrice:F8} (from {metrics.DailyPriceCount} updates today)\n";
                     emailBody += $"Daily Price Sum: {metrics.DailyPriceSum:F8}\n";
+                    emailBody += $"Daily Range: {metrics.DailyMin:F8} - {metrics.DailyMax:F8}\n";
+                    emailBody += $"Daily Change: {metrics.DailyPriceChange:F8}\n";
+                    emailBody += $"Volatility Count: {metrics.DailyVolatilityCount}\n";
+                    emailBody += $"2-Week Average Min: {metrics.AverageMin:F8}\n";
+                    emailBody += $"2-Week Average Max: {metrics.AverageMax:F8}\n";
+                    emailBody += $"All-Time Absolute Min: {metrics.AbsoluteMin:F8}\n";
+                    emailBody += $"All-Time Absolute Max: {metrics.AbsoluteMax:F8}\n";
+                    emailBody += $"Stored Below Avg Min Threshold: {(metrics.StoredBelowAvgMinThreshold.HasValue ? metrics.StoredBelowAvgMinThreshold.Value.ToString("F8") : "None")}\n";
+                    emailBody += $"Stored Above Avg Max Threshold: {(metrics.StoredAboveAvgMaxThreshold.HasValue ? metrics.StoredAboveAvgMaxThreshold.Value.ToString("F8") : "None")}\n";
+                    emailBody += $"Last Updated: {metrics.LastUpdated:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += $"Last Price Update: {metrics.LastPriceUpdate:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += $"Last Average Update: {metrics.LastAverageUpdate:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += "\n";
+                }
+            }
+
+            // Section 2: Most Volatile Symbols (top 10 by volatility count)
+            var mostVolatileSymbols = relevantMetrics
+                .Where(x => x.Value.DailyVolatilityCount > 0)
+                .OrderByDescending(x => x.Value.DailyVolatilityCount)
+                .Take(10)
+                .ToList();
+
+            if (mostVolatileSymbols.Any())
+            {
+                emailBody += "📈 MOST VOLATILE SYMBOLS (Top 10) 📈\n";
+                emailBody += "=====================================\n\n";
+
+                foreach (var kvp in mostVolatileSymbols)
+                {
+                    var symbol = kvp.Key;
+                    var metrics = kvp.Value;
+                    var hasEvents = relevantEvents.ContainsKey(symbol);
+                    var events = hasEvents ? relevantEvents[symbol].events : new List<string>();
+                    var score = hasEvents ? relevantEvents[symbol].score : 0;
+
+                    emailBody += $"Symbol: {symbol}\n";
+                    emailBody += $"Volatility Count: {metrics.DailyVolatilityCount}\n";
+                    if (hasEvents)
+                    {
+                        emailBody += $"Score: {score:F2}\n";
+                        emailBody += "Events:\n";
+                        foreach (var evt in events)
+                        {
+                            emailBody += $"  • {evt}\n";
+                        }
+                    }
+                    emailBody += $"Current Price: {metrics.CurrentPrice:F8}\n";
+                    emailBody += $"Volume: {metrics.Volume:F8}\n";
+                    emailBody += $"Daily Average Price: {metrics.AveragePrice:F8} (from {metrics.DailyPriceCount} updates today)\n";
+                    emailBody += $"Daily Price Sum: {metrics.DailyPriceSum:F8}\n";
+                    emailBody += $"Daily Range: {metrics.DailyMin:F8} - {metrics.DailyMax:F8}\n";
+                    emailBody += $"Daily Change: {metrics.DailyPriceChange:F8}\n";
+                    emailBody += $"2-Week Average Min: {metrics.AverageMin:F8}\n";
+                    emailBody += $"2-Week Average Max: {metrics.AverageMax:F8}\n";
+                    emailBody += $"All-Time Absolute Min: {metrics.AbsoluteMin:F8}\n";
+                    emailBody += $"All-Time Absolute Max: {metrics.AbsoluteMax:F8}\n";
+                    emailBody += $"Stored Below Avg Min Threshold: {(metrics.StoredBelowAvgMinThreshold.HasValue ? metrics.StoredBelowAvgMinThreshold.Value.ToString("F8") : "None")}\n";
+                    emailBody += $"Stored Above Avg Max Threshold: {(metrics.StoredAboveAvgMaxThreshold.HasValue ? metrics.StoredAboveAvgMaxThreshold.Value.ToString("F8") : "None")}\n";
+                    emailBody += $"Last Updated: {metrics.LastUpdated:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += $"Last Price Update: {metrics.LastPriceUpdate:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += $"Last Average Update: {metrics.LastAverageUpdate:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += "\n";
+                }
+            }
+
+            // Section 3: Biggest Price Change (top 10 by daily price change)
+            var biggestPriceChangeSymbols = relevantMetrics
+                .Where(x => x.Value.DailyPriceChange > 0)
+                .OrderByDescending(x => x.Value.DailyPriceChange)
+                .Take(10)
+                .ToList();
+
+            if (biggestPriceChangeSymbols.Any())
+            {
+                emailBody += "💰 BIGGEST PRICE CHANGE (Top 10) 💰\n";
+                emailBody += "==================================\n\n";
+
+                foreach (var kvp in biggestPriceChangeSymbols)
+                {
+                    var symbol = kvp.Key;
+                    var metrics = kvp.Value;
+                    var hasEvents = relevantEvents.ContainsKey(symbol);
+                    var events = hasEvents ? relevantEvents[symbol].events : new List<string>();
+                    var score = hasEvents ? relevantEvents[symbol].score : 0;
+
+                    emailBody += $"Symbol: {symbol}\n";
+                    emailBody += $"Daily Price Change: {metrics.DailyPriceChange:F8}\n";
+                    if (hasEvents)
+                    {
+                        emailBody += $"Score: {score:F2}\n";
+                        emailBody += "Events:\n";
+                        foreach (var evt in events)
+                        {
+                            emailBody += $"  • {evt}\n";
+                        }
+                    }
+                    emailBody += $"Current Price: {metrics.CurrentPrice:F8}\n";
+                    emailBody += $"Volume: {metrics.Volume:F8}\n";
+                    emailBody += $"Daily Average Price: {metrics.AveragePrice:F8} (from {metrics.DailyPriceCount} updates today)\n";
+                    emailBody += $"Daily Price Sum: {metrics.DailyPriceSum:F8}\n";
+                    emailBody += $"Daily Range: {metrics.DailyMin:F8} - {metrics.DailyMax:F8}\n";
+                    emailBody += $"Volatility Count: {metrics.DailyVolatilityCount}\n";
+                    emailBody += $"2-Week Average Min: {metrics.AverageMin:F8}\n";
+                    emailBody += $"2-Week Average Max: {metrics.AverageMax:F8}\n";
+                    emailBody += $"All-Time Absolute Min: {metrics.AbsoluteMin:F8}\n";
+                    emailBody += $"All-Time Absolute Max: {metrics.AbsoluteMax:F8}\n";
+                    emailBody += $"Stored Below Avg Min Threshold: {(metrics.StoredBelowAvgMinThreshold.HasValue ? metrics.StoredBelowAvgMinThreshold.Value.ToString("F8") : "None")}\n";
+                    emailBody += $"Stored Above Avg Max Threshold: {(metrics.StoredAboveAvgMaxThreshold.HasValue ? metrics.StoredAboveAvgMaxThreshold.Value.ToString("F8") : "None")}\n";
+                    emailBody += $"Last Updated: {metrics.LastUpdated:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += $"Last Price Update: {metrics.LastPriceUpdate:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += $"Last Average Update: {metrics.LastAverageUpdate:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += "\n";
+                }
+            }
+
+            // Section 4: Rest of Symbols (sorted by score)
+            var restSymbols = relevantMetrics
+                .Where(x => !task.PrimarySymbols.Contains(x.Key) && 
+                           !mostVolatileSymbols.Any(v => v.Key == x.Key) && 
+                           !biggestPriceChangeSymbols.Any(b => b.Key == x.Key))
+                .OrderByDescending(x => relevantEvents.ContainsKey(x.Key) ? relevantEvents[x.Key].score : 0)
+                .ToList();
+
+            if (restSymbols.Any())
+            {
+                emailBody += "📊 REMAINING SYMBOLS (Sorted by Score) 📊\n";
+                emailBody += "==========================================\n\n";
+
+                foreach (var kvp in restSymbols)
+                {
+                    var symbol = kvp.Key;
+                    var metrics = kvp.Value;
+                    var hasEvents = relevantEvents.ContainsKey(symbol);
+                    var events = hasEvents ? relevantEvents[symbol].events : new List<string>();
+                    var score = hasEvents ? relevantEvents[symbol].score : 0;
+
+                    emailBody += $"Symbol: {symbol}\n";
+                    if (hasEvents)
+                    {
+                        emailBody += $"Score: {score:F2}\n";
+                        emailBody += "Events:\n";
+                        foreach (var evt in events)
+                        {
+                            emailBody += $"  • {evt}\n";
+                        }
+                    }
+                    emailBody += $"Current Price: {metrics.CurrentPrice:F8}\n";
+                    emailBody += $"Volume: {metrics.Volume:F8}\n";
+                    emailBody += $"Daily Average Price: {metrics.AveragePrice:F8} (from {metrics.DailyPriceCount} updates today)\n";
+                    emailBody += $"Daily Price Sum: {metrics.DailyPriceSum:F8}\n";
+                    emailBody += $"Daily Range: {metrics.DailyMin:F8} - {metrics.DailyMax:F8}\n";
+                    emailBody += $"Daily Change: {metrics.DailyPriceChange:F8}\n";
+                    emailBody += $"Volatility Count: {metrics.DailyVolatilityCount}\n";
                     emailBody += $"2-Week Average Min: {metrics.AverageMin:F8}\n";
                     emailBody += $"2-Week Average Max: {metrics.AverageMax:F8}\n";
                     emailBody += $"All-Time Absolute Min: {metrics.AbsoluteMin:F8}\n";

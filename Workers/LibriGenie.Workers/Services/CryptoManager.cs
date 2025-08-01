@@ -311,12 +311,39 @@ public class CryptoManager : ICryptoManager
                 decimal score = 0;
                 var hasEvents = false;
 
+                // Reset daily metrics if it's a new day
+                var today = DateTime.UtcNow.Date;
+                var lastUpdateDate = _cryptoMetrics[symbol].LastPriceUpdate.Date;
+                if (today != lastUpdateDate)
+                {
+                    lock (_lockObject)
+                    {
+                        _cryptoMetrics[symbol].DailyMin = 0;
+                        _cryptoMetrics[symbol].DailyMax = 0;
+                        _cryptoMetrics[symbol].DailyVolatilityCount = 0;
+                        _cryptoMetrics[symbol].DailyPriceChange = 0;
+                    }
+                }
+
                 // Update current price and last price update
                 lock (_lockObject)
                 {
                     _cryptoMetrics[symbol].CurrentPrice = price;
                     _cryptoMetrics[symbol].Volume = volumeValue;
                     _cryptoMetrics[symbol].LastPriceUpdate = DateTime.UtcNow;
+                    
+                    // Update daily min/max tracking
+                    if (price < _cryptoMetrics[symbol].DailyMin || _cryptoMetrics[symbol].DailyMin == 0)
+                    {
+                        _cryptoMetrics[symbol].DailyMin = price;
+                    }
+                    if (price > _cryptoMetrics[symbol].DailyMax)
+                    {
+                        _cryptoMetrics[symbol].DailyMax = price;
+                    }
+                    
+                    // Calculate daily price change
+                    _cryptoMetrics[symbol].DailyPriceChange = _cryptoMetrics[symbol].DailyMax - _cryptoMetrics[symbol].DailyMin;
                 }
 
                 // Update average price tracking
@@ -439,6 +466,25 @@ public class CryptoManager : ICryptoManager
                     }
                 }
 
+                // Track volatility count (price moving between below avg min and above avg max)
+                var previousPrice = updatedMetricsForSymbol.CurrentPrice;
+                if (previousPrice > 0)
+                {
+                    var wasBelowMin = previousPrice < updatedMetricsForSymbol.AverageMin;
+                    var wasAboveMax = previousPrice > updatedMetricsForSymbol.AverageMax;
+                    var isBelowMin = price < updatedMetricsForSymbol.AverageMin;
+                    var isAboveMax = price > updatedMetricsForSymbol.AverageMax;
+                    
+                    // If price moved from below min to above max or vice versa, increment volatility count
+                    if ((wasBelowMin && isAboveMax) || (wasAboveMax && isBelowMin))
+                    {
+                        lock (_lockObject)
+                        {
+                            _cryptoMetrics[symbol].DailyVolatilityCount++;
+                        }
+                    }
+                }
+
                 // Always add metrics to the result, regardless of events
                 lock (_lockObject)
                 {
@@ -458,7 +504,11 @@ public class CryptoManager : ICryptoManager
                         DailyPriceCount = _cryptoMetrics[symbol].DailyPriceCount,
                         DailyPriceSum = _cryptoMetrics[symbol].DailyPriceSum,
                         StoredBelowAvgMinThreshold = _cryptoMetrics[symbol].StoredBelowAvgMinThreshold,
-                        StoredAboveAvgMaxThreshold = _cryptoMetrics[symbol].StoredAboveAvgMaxThreshold
+                        StoredAboveAvgMaxThreshold = _cryptoMetrics[symbol].StoredAboveAvgMaxThreshold,
+                        DailyMin = _cryptoMetrics[symbol].DailyMin,
+                        DailyMax = _cryptoMetrics[symbol].DailyMax,
+                        DailyVolatilityCount = _cryptoMetrics[symbol].DailyVolatilityCount,
+                        DailyPriceChange = _cryptoMetrics[symbol].DailyPriceChange
                     };
                 }
 
@@ -608,7 +658,11 @@ public class CryptoManager : ICryptoManager
                 DailyPriceCount = 0,
                 DailyPriceSum = 0,
                 StoredBelowAvgMinThreshold = null,
-                StoredAboveAvgMaxThreshold = null
+                StoredAboveAvgMaxThreshold = null,
+                DailyMin = 0,
+                DailyMax = 0,
+                DailyVolatilityCount = 0,
+                DailyPriceChange = 0
             };
 
             lock (_lockObject)
@@ -821,6 +875,11 @@ public class CryptoMetrics
     // New fields for threshold tracking
     public decimal? StoredBelowAvgMinThreshold { get; set; }
     public decimal? StoredAboveAvgMaxThreshold { get; set; }
+    // New fields for daily volatility tracking
+    public decimal DailyMin { get; set; }
+    public decimal DailyMax { get; set; }
+    public int DailyVolatilityCount { get; set; } // Count of times price moved between below avg min and above avg max
+    public decimal DailyPriceChange { get; set; } // Daily price change from min to max
 }
 
 public class CoinbaseProduct

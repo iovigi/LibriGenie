@@ -18,8 +18,10 @@ const Dashboard = function Dashboard() {
     const [passwordWordpress, setPasswordWordpress] = useState('');
     const [enable, setEnable] = useState(false);
     const [symbols, setSymbols] = useState([]);
+    const [primarySymbols, setPrimarySymbols] = useState([]);
     const [availableSymbols, setAvailableSymbols] = useState([]);
     const [loadingSymbols, setLoadingSymbols] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -28,7 +30,7 @@ const Dashboard = function Dashboard() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: "same-origin",
-            body: JSON.stringify({ category, typeTrigger, cron, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, enable, symbols }),
+            body: JSON.stringify({ category, typeTrigger, cron, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, enable, symbols, primarySymbols }),
         })
 
         if (response.ok) {
@@ -60,6 +62,7 @@ const Dashboard = function Dashboard() {
                 setTypeTrigger(data.settings?.typeTrigger);
                 setCron(data.settings?.cron);
                 setSymbols(data.settings?.symbols || []);
+                setPrimarySymbols(data.settings?.primarySymbols || []);
             })
     }, [])
 
@@ -97,17 +100,65 @@ const Dashboard = function Dashboard() {
         });
     };
 
+    const handlePrimarySymbolToggle = (symbolId) => {
+        setPrimarySymbols(prev => {
+            if (prev.includes(symbolId)) {
+                return prev.filter(id => id !== symbolId);
+            } else {
+                return [...prev, symbolId];
+            }
+        });
+    };
+
     const handleSelectAll = () => {
         if (symbols.length === availableSymbols.length) {
             // If all are selected, deselect all
             setSymbols([]);
+            setPrimarySymbols([]);
         } else {
             // If not all are selected, select all
             setSymbols(availableSymbols.map(symbol => symbol.id));
         }
     };
 
+    const handleSelectAllPrimary = () => {
+        // Get all enabled symbols
+        const enabledSymbols = availableSymbols.filter(symbol => symbols.includes(symbol.id));
+        
+        // Check if all enabled symbols are already primary
+        const allEnabledArePrimary = enabledSymbols.every(symbol => primarySymbols.includes(symbol.id));
+        
+        if (allEnabledArePrimary) {
+            // If all enabled symbols are primary, deselect all primary
+            setPrimarySymbols([]);
+        } else {
+            // If not all enabled symbols are primary, select all enabled symbols as primary
+            const enabledSymbolIds = enabledSymbols.map(symbol => symbol.id);
+            setPrimarySymbols(enabledSymbolIds);
+        }
+    };
+
     const isAllSelected = availableSymbols.length > 0 && symbols.length === availableSymbols.length;
+
+    // Check if all enabled symbols are primary
+    const enabledSymbols = availableSymbols.filter(symbol => symbols.includes(symbol.id));
+    const isAllEnabledPrimary = enabledSymbols.length > 0 && enabledSymbols.every(symbol => primarySymbols.includes(symbol.id));
+
+    // Filter symbols based on search term
+    const filteredSymbols = availableSymbols.filter(symbol => {
+        if (!searchTerm) return true;
+        
+        const searchLower = searchTerm.toLowerCase();
+        const displayName = symbol.display_name?.toLowerCase() || '';
+        const baseCurrency = symbol.base_currency?.toLowerCase() || '';
+        const quoteCurrency = symbol.quote_currency?.toLowerCase() || '';
+        const symbolId = symbol.id?.toLowerCase() || '';
+        
+        return displayName.includes(searchLower) || 
+               baseCurrency.includes(searchLower) || 
+               quoteCurrency.includes(searchLower) || 
+               symbolId.includes(searchLower);
+    });
 
     return (<>
         <Head>
@@ -220,33 +271,88 @@ const Dashboard = function Dashboard() {
                                              </div>
                                          ) : (
                                              <div className="row">
-                                                 {availableSymbols.length > 0 && (
-                                                     <div className="col-12 mb-3">
-                                                         <button
-                                                             type="button"
-                                                             className="btn btn-outline-primary btn-sm"
-                                                             onClick={handleSelectAll}
-                                                         >
-                                                             {isAllSelected ? 'Deselect All' : 'Select All'}
-                                                         </button>
+                                                                                                   {availableSymbols.length > 0 && (
+                                                      <div className="col-12 mb-3">
+                                                          <div className="d-flex justify-content-between align-items-center">
+                                                              <div className="d-flex align-items-center">
+                                                                  <button
+                                                                      type="button"
+                                                                      className="btn btn-outline-primary btn-sm"
+                                                                      onClick={handleSelectAll}
+                                                                  >
+                                                                      {isAllSelected ? 'Deselect All' : 'Select All'}
+                                                                  </button>
+                                                                  <button
+                                                                      type="button"
+                                                                      className="btn btn-outline-primary btn-sm"
+                                                                      onClick={handleSelectAllPrimary}
+                                                                      style={{ marginLeft: '5px' }}
+                                                                  >
+                                                                      {isAllEnabledPrimary ? 'Deselect All Primary' : 'Select All Primary'}
+                                                                  </button>
+                                                              </div>
+                                                              <div className="d-flex align-items-center">
+                                                                  <label htmlFor="symbol-search" className="form-label me-2 mb-0">Search:</label>
+                                                                  <input
+                                                                      type="text"
+                                                                      id="symbol-search"
+                                                                      className="form-control form-control-sm"
+                                                                      style={{ width: '200px' }}
+                                                                      placeholder="Search symbols..."
+                                                                      value={searchTerm}
+                                                                      onChange={(e) => setSearchTerm(e.target.value)}
+                                                                  />
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  )}
+                                                 <div className="col-12">
+                                                     <div className="border rounded p-3" style={{ height: '65vh', overflowY: 'auto' }}>
+                                                         {filteredSymbols.map((symbol) => (
+                                                             <div key={symbol.id} className="d-flex align-items-center justify-content-between py-2 border-bottom">
+                                                                 <div className="d-flex align-items-center">
+                                                                     <div className="form-check me-4">
+                                                                         <input
+                                                                             className="form-check-input"
+                                                                             type="checkbox"
+                                                                             id={`enable-${symbol.id}`}
+                                                                             checked={symbols.includes(symbol.id)}
+                                                                             onChange={() => handleSymbolToggle(symbol.id)}
+                                                                         />
+                                                                         <label className="form-check-label fw-bold" htmlFor={`enable-${symbol.id}`}>
+                                                                             Enable
+                                                                         </label>
+                                                                     </div>
+                                                                     <div className="form-check me-4">
+                                                                         <input
+                                                                             className="form-check-input"
+                                                                             type="checkbox"
+                                                                             id={`primary-${symbol.id}`}
+                                                                             checked={primarySymbols.includes(symbol.id)}
+                                                                             onChange={() => handlePrimarySymbolToggle(symbol.id)}
+                                                                             disabled={!symbols.includes(symbol.id)}
+                                                                         />
+                                                                         <label className={`form-check-label ${!symbols.includes(symbol.id) ? 'text-muted' : 'fw-bold'}`} htmlFor={`primary-${symbol.id}`}>
+                                                                             Primary
+                                                                         </label>
+                                                                     </div>
+                                                                 </div>
+                                                                 <div className="text-end">
+                                                                     <span className="fw-semibold">{symbol.display_name}</span>
+                                                                     <br />
+                                                                     <small className="text-muted">{symbol.base_currency}/{symbol.quote_currency}</small>
+                                                                 </div>
+                                                             </div>
+                                                         ))}
+                                                         {filteredSymbols.length === 0 && (
+                                                             <div className="text-center py-4">
+                                                                 <p className="text-muted">
+                                                                     {searchTerm ? `No symbols found matching "${searchTerm}"` : 'No symbols available'}
+                                                                 </p>
+                                                             </div>
+                                                         )}
                                                      </div>
-                                                 )}
-                                                 {availableSymbols.map((symbol) => (
-                                                     <div key={symbol.id} className="col-md-6 col-lg-4 mb-2">
-                                                         <div className="form-check">
-                                                             <input
-                                                                 className="form-check-input"
-                                                                 type="checkbox"
-                                                                 id={symbol.id}
-                                                                 checked={symbols.includes(symbol.id)}
-                                                                 onChange={() => handleSymbolToggle(symbol.id)}
-                                                             />
-                                                             <label className="form-check-label" htmlFor={symbol.id}>
-                                                                 {symbol.display_name} ({symbol.base_currency}/{symbol.quote_currency})
-                                                             </label>
-                                                         </div>
-                                                     </div>
-                                                 ))}
+                                                 </div>
                                                  {availableSymbols.length === 0 && !loadingSymbols && (
                                                      <div className="col-12">
                                                          <p className="text-muted">No symbols available</p>
