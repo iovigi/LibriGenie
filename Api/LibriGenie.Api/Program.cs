@@ -8,8 +8,21 @@ using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+var appSettings = builder.Configuration.Get<AppSettings>()!;
 
+// Configure logging to write to file
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddSimpleConsole(options =>
+{
+    options.SingleLine = true;
+    options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+});
+
+// Add file logging
+builder.Logging.AddProvider(new FileLoggerProvider(appSettings.LogFile));
+
+// Add services to the container.
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -55,6 +68,7 @@ builder.Services.AddSingleton(sp =>
 });
 
 builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddScoped<IMailService, MailService>();
 
 builder.Services.AddAuthentication("Basic")
 .AddScheme<AuthenticationSchemeOptions, BasicAuthenticationHandler>("Basic", null);

@@ -1,5 +1,7 @@
 ﻿using LibriGenie.Workers.Configuration;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 
 namespace LibriGenie.Workers.Services;
 
@@ -57,6 +59,41 @@ public class LibriGenieClient(HttpClient httpClient, AppSettings appSettings, IL
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to set last run for task {taskId}: {message}", id, ex.Message);
+            throw;
+        }
+    }
+
+    public async Task SendTextFromNoReply(string to, string subject, string body, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var emailRequest = new
+            {
+                To = to,
+                Subject = subject,
+                Body = body
+            };
+
+            var json = JsonSerializer.Serialize(emailRequest);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            httpClient.DefaultRequestHeaders.Authorization = appSettings.ApiConfiguration.GetAuthenticationHeaderValue();
+
+            var response = await httpClient.PostAsync($"{appSettings.ApiConfiguration.Endpoint}Email/Send", content, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                logger.LogError("Failed to send email via API. Status: {status}, Error: {error}",
+                    response.StatusCode, errorContent);
+                throw new Exception($"Failed to send email via API. Status: {response.StatusCode}, Error: {errorContent}");
+            }
+
+            logger.LogInformation("Email sent successfully via API to {to}", to);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error sending email via API to {to}: {message}", to, ex.Message);
             throw;
         }
     }

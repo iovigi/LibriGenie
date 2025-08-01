@@ -1,5 +1,4 @@
 using LibriGenie.Workers.Configuration;
-using LibriGenie.Workers.Services.Brevo;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -331,7 +330,7 @@ public class CryptoManager : ICryptoManager
                     _cryptoMetrics[symbol].CurrentPrice = price;
                     _cryptoMetrics[symbol].Volume = volumeValue;
                     _cryptoMetrics[symbol].LastPriceUpdate = DateTime.UtcNow;
-                    
+
                     // Update daily min/max tracking
                     if (price < _cryptoMetrics[symbol].DailyMin || _cryptoMetrics[symbol].DailyMin == 0)
                     {
@@ -341,7 +340,7 @@ public class CryptoManager : ICryptoManager
                     {
                         _cryptoMetrics[symbol].DailyMax = price;
                     }
-                    
+
                     // Calculate daily price change
                     _cryptoMetrics[symbol].DailyPriceChange = _cryptoMetrics[symbol].DailyMax - _cryptoMetrics[symbol].DailyMin;
                 }
@@ -374,6 +373,17 @@ public class CryptoManager : ICryptoManager
                         score += updatedMetricsForSymbol.AverageMin - price;
                         events.Add($"Price {price:F8} is below average minimum {updatedMetricsForSymbol.AverageMin:F8} - NEW THRESHOLD SET");
                         hasEvents = true;
+
+                        lock (_lockObject)
+                        {
+                            if (_cryptoMetrics[symbol].IsPassedAboveAvgMaxPrevious)
+                            {
+                                _cryptoMetrics[symbol].DailyVolatilityCount++;
+                            }
+
+                            _cryptoMetrics[symbol].IsPassedBelowAvgMinPrevious = true;
+                            _cryptoMetrics[symbol].IsPassedAboveAvgMaxPrevious = false;
+                        }
                     }
                     // If price goes below the stored threshold, trigger new event
                     else if (price < updatedMetricsForSymbol.StoredBelowAvgMinThreshold.Value)
@@ -413,6 +423,17 @@ public class CryptoManager : ICryptoManager
                         score += price - updatedMetricsForSymbol.AverageMax;
                         events.Add($"Price {price:F8} is above average maximum {updatedMetricsForSymbol.AverageMax:F8} - NEW THRESHOLD SET");
                         hasEvents = true;
+
+                        lock (_lockObject)
+                        {
+                            if (_cryptoMetrics[symbol].IsPassedBelowAvgMinPrevious)
+                            {
+                                _cryptoMetrics[symbol].DailyVolatilityCount++;
+                            }
+
+                            _cryptoMetrics[symbol].IsPassedAboveAvgMaxPrevious = true;
+                            _cryptoMetrics[symbol].IsPassedBelowAvgMinPrevious = false;
+                        }
                     }
                     // If price goes above the stored threshold, trigger new event
                     else if (price > updatedMetricsForSymbol.StoredAboveAvgMaxThreshold.Value)
@@ -421,6 +442,7 @@ public class CryptoManager : ICryptoManager
                         {
                             _cryptoMetrics[symbol].StoredAboveAvgMaxThreshold = price;
                         }
+
                         score += price - updatedMetricsForSymbol.StoredAboveAvgMaxThreshold.Value;
                         events.Add($"Price {price:F8} went above stored threshold {updatedMetricsForSymbol.StoredAboveAvgMaxThreshold.Value:F8} - NEW HIGH");
                         hasEvents = true;
@@ -466,25 +488,6 @@ public class CryptoManager : ICryptoManager
                     }
                 }
 
-                // Track volatility count (price moving between below avg min and above avg max)
-                var previousPrice = updatedMetricsForSymbol.CurrentPrice;
-                if (previousPrice > 0)
-                {
-                    var wasBelowMin = previousPrice < updatedMetricsForSymbol.AverageMin;
-                    var wasAboveMax = previousPrice > updatedMetricsForSymbol.AverageMax;
-                    var isBelowMin = price < updatedMetricsForSymbol.AverageMin;
-                    var isAboveMax = price > updatedMetricsForSymbol.AverageMax;
-                    
-                    // If price moved from below min to above max or vice versa, increment volatility count
-                    if ((wasBelowMin && isAboveMax) || (wasAboveMax && isBelowMin))
-                    {
-                        lock (_lockObject)
-                        {
-                            _cryptoMetrics[symbol].DailyVolatilityCount++;
-                        }
-                    }
-                }
-
                 // Always add metrics to the result, regardless of events
                 lock (_lockObject)
                 {
@@ -508,7 +511,9 @@ public class CryptoManager : ICryptoManager
                         DailyMin = _cryptoMetrics[symbol].DailyMin,
                         DailyMax = _cryptoMetrics[symbol].DailyMax,
                         DailyVolatilityCount = _cryptoMetrics[symbol].DailyVolatilityCount,
-                        DailyPriceChange = _cryptoMetrics[symbol].DailyPriceChange
+                        DailyPriceChange = _cryptoMetrics[symbol].DailyPriceChange,
+                        IsPassedBelowAvgMinPrevious = _cryptoMetrics[symbol].IsPassedBelowAvgMinPrevious,
+                        IsPassedAboveAvgMaxPrevious = _cryptoMetrics[symbol].IsPassedAboveAvgMaxPrevious
                     };
                 }
 
@@ -878,6 +883,8 @@ public class CryptoMetrics
     // New fields for daily volatility tracking
     public decimal DailyMin { get; set; }
     public decimal DailyMax { get; set; }
+    public bool IsPassedBelowAvgMinPrevious { get; set; }
+    public bool IsPassedAboveAvgMaxPrevious { get; set; }
     public int DailyVolatilityCount { get; set; } // Count of times price moved between below avg min and above avg max
     public decimal DailyPriceChange { get; set; } // Daily price change from min to max
 }

@@ -1,11 +1,10 @@
 using LibriGenie.Workers.Services;
-using LibriGenie.Workers.Services.Brevo;
 using LibriGenie.Workers.Services.ContentGenerate;
 using System.Text.Json;
 
 namespace LibriGenie.Workers;
 
-public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher wordpressPublisher, IContentGenerator contentGenerator, IMailService mailService, ICryptoManager cryptoManager, ILogger<Worker> logger) : BackgroundService
+public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher wordpressPublisher, IContentGenerator contentGenerator, ICryptoManager cryptoManager, IMailService mailService, ILogger<Worker> logger) : BackgroundService
 {
     private List<Services.Models.Task> GetTasksForRunFromBackup(int page, int pageSize)
     {
@@ -140,7 +139,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                             {
                                 // Handle regular content generation tasks
                                 var content = await contentGenerator.Generate(task.Category, stoppingToken);
-                                await mailService.SendTextFromNoReply(task.Email, content.Title, content.Content, stoppingToken);
+                                await mailService.Send(task.Email, content.Title, content.Content, stoppingToken);
 
                                 if (task.EnableWordpress)
                                 {
@@ -438,7 +437,7 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
 
             // Send email
             var subject = "Crypto Spike Alerts & Metrics";
-            await mailService.SendTextFromNoReply(task.Email, subject, emailBody, stoppingToken);
+            await mailService.Send(task.Email, subject, emailBody, stoppingToken);
 
             logger.LogInformation("Sent crypto report to {email} for {count} symbols with events (total symbols: {totalSymbols})",
                 task.Email, symbolsWithEvents.Count, task.Symbols.Count);

@@ -11,6 +11,8 @@ public class AppSettings
     public MailSettings MailSettings { get; set; } = new MailSettings();
     public DataClientSettings DataClientSettings { get; set; } = new DataClientSettings();
     public string LogFile { get; set; } = string.Empty;
+
+    public GmailSettings GmailSettings { get; set; }
 }
 
 public class OllamaSettings
@@ -36,7 +38,6 @@ public class ApiConfiguration
 
 public class MailSettings
 {
-    public string BrevoApiKey { get; set; }
     public string NoReplyEmail { get; set; }
 }
 
@@ -44,4 +45,11 @@ public class DataClientSettings
 {
     public string BaseUrl { get; set; } = string.Empty;
     public string SystemAuthKey { get; set; } = string.Empty;
+}
+
+public class GmailSettings
+{
+    public string Email { get; set; }
+
+    public string Password { get; set; }
 }
