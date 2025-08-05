@@ -6,6 +6,28 @@ namespace LibriGenie.Workers;
 
 public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher wordpressPublisher, IContentGenerator contentGenerator, ICryptoManager cryptoManager, IMailService mailService, ILogger<Worker> logger) : BackgroundService
 {
+    // Static field to track daily droppers (symbols that hit new absolute minimums)
+    private static Dictionary<string, (decimal PreviousMin, decimal CurrentMin, DateTime TimeStamp, decimal CurrentPrice, decimal AvgPrice)> _dailyDroppers = new();
+    private static DateTime _lastDailyReset = DateTime.UtcNow.Date;
+    private void ResetDailyDroppersIfNeeded()
+    {
+        var currentDate = DateTime.UtcNow.Date;
+        if (currentDate > _lastDailyReset)
+        {
+            _dailyDroppers.Clear();
+            _lastDailyReset = currentDate;
+            logger.LogInformation("Daily droppers reset for new day: {date}", currentDate);
+        }
+    }
+
+    private void TrackDailyDropper(string symbol, decimal previousMin, decimal currentMin, decimal currentPrice, decimal avgPrice)
+    {
+        ResetDailyDroppersIfNeeded();
+        _dailyDroppers[symbol] = (previousMin, currentMin, DateTime.UtcNow, currentPrice, avgPrice);
+        logger.LogInformation("Tracked daily dropper: {symbol} - Previous: {previousMin:F8}, Current: {currentMin:F8}", 
+            symbol, previousMin, currentMin);
+    }
+
     private List<Services.Models.Task> GetTasksForRunFromBackup(int page, int pageSize)
     {
         try
@@ -85,6 +107,43 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                     var result = await cryptoManager.Recalculate();
                     cryptoEvents = result.Events;
                     cryptoMetrics = result.Metrics;
+
+                    // Track daily droppers (symbols that hit new absolute minimums)
+                    foreach (var kvp in cryptoEvents)
+                    {
+                        var symbol = kvp.Key;
+                        var events = kvp.Value.events;
+                        
+                        // Check if any event is about new absolute minimum
+                        var newAbsoluteMinEvent = events.FirstOrDefault(e => e.Contains("NEW ABSOLUTE MIN"));
+                        if (!string.IsNullOrEmpty(newAbsoluteMinEvent) && cryptoMetrics.ContainsKey(symbol))
+                        {
+                            var metrics = cryptoMetrics[symbol];
+                            TrackDailyDropper(symbol, metrics.PreviousAbsoluteMin, metrics.AbsoluteMin, metrics.CurrentPrice, metrics.AveragePrice);
+                        }
+                    }
+
+                    // Remove symbols from daily droppers if current price is higher than average minimum
+                    var symbolsToRemove = new List<string>();
+                    foreach (var kvp in _dailyDroppers)
+                    {
+                        var symbol = kvp.Key;
+                        if (cryptoMetrics.ContainsKey(symbol))
+                        {
+                            var metrics = cryptoMetrics[symbol];
+                            if (metrics.CurrentPrice > metrics.AverageMin)
+                            {
+                                symbolsToRemove.Add(symbol);
+                                logger.LogInformation("Removed {symbol} from daily droppers - current price {currentPrice:F8} is above average min {avgMin:F8}", 
+                                    symbol, metrics.CurrentPrice, metrics.AverageMin);
+                            }
+                        }
+                    }
+
+                    foreach (var symbol in symbolsToRemove)
+                    {
+                        _dailyDroppers.Remove(symbol);
+                    }
 
                     if (cryptoEvents.Any())
                     {
@@ -282,7 +341,39 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
                 }
             }
 
-            // Section 2: Most Volatile Symbols (top 10 by volatility count)
+            // Section 2: The Dropper of the day (symbols that hit new absolute minimums today)
+            var dailyDroppersForTask = _dailyDroppers
+                .Where(x => task.Symbols.Contains(x.Key))
+                .OrderByDescending(x => x.Value.PreviousMin - x.Value.CurrentMin) // Order by biggest drop (previous - current)
+                .ToList();
+
+            if (dailyDroppersForTask.Any())
+            {
+                emailBody += "📉 THE DROPPER OF THE DAY 📉\n";
+                emailBody += "============================\n\n";
+
+                foreach (var kvp in dailyDroppersForTask)
+                {
+                    var symbol = kvp.Key;
+                    var dropperInfo = kvp.Value;
+                    var dropAmount = dropperInfo.PreviousMin - dropperInfo.CurrentMin;
+                    var dropPercentage = (dropAmount / dropperInfo.PreviousMin) * 100;
+                    var currentPercentage = (cryptoMetrics[symbol].CurrentPrice / dropperInfo.CurrentMin) * 100;
+
+                    emailBody += $"Symbol: {symbol}\n";
+                    emailBody += $"Current Price: {cryptoMetrics[symbol].CurrentPrice:F8}\n";
+                    emailBody += $"Current Percentage: {currentPercentage:F2}%\n";
+                    emailBody += $"Average Daily Price: {cryptoMetrics[symbol].AveragePrice:F8}\n";
+                    emailBody += $"Previous Absolute Min: {dropperInfo.PreviousMin:F8}\n";
+                    emailBody += $"New Absolute Min: {dropperInfo.CurrentMin:F8}\n";
+                    emailBody += $"Drop Amount: {dropAmount:F8}\n";
+                    emailBody += $"Drop Percentage: {dropPercentage:F2}%\n";
+                    emailBody += $"Time of Drop: {dropperInfo.TimeStamp:yyyy-MM-dd HH:mm:ss} UTC\n";
+                    emailBody += "\n";
+                }
+            }
+
+            // Section 3: Most Volatile Symbols (top 10 by volatility count)
             var mostVolatileSymbols = relevantMetrics
                 .Where(x => x.Value.DailyVolatilityCount > 0)
                 .OrderByDescending(x => x.Value.DailyVolatilityCount)
@@ -386,7 +477,8 @@ public class Worker(ILibriGenieClient libriGenieClient, IWordpressPublisher word
             var restSymbols = filteredMetrics
                 .Where(x => !task.PrimarySymbols.Contains(x.Key) && 
                            !mostVolatileSymbols.Any(v => v.Key == x.Key) && 
-                           !biggestPriceChangeSymbols.Any(b => b.Key == x.Key))
+                           !biggestPriceChangeSymbols.Any(b => b.Key == x.Key) &&
+                           !dailyDroppersForTask.Any(d => d.Key == x.Key))
                 .OrderByDescending(x => relevantEvents.ContainsKey(x.Key) ? relevantEvents[x.Key].score : 0)
                 .ToList();
 

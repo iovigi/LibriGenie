@@ -144,6 +144,16 @@ public class CryptoManager : ICryptoManager
             lock (_lockObject)
             {
                 _cryptoMetrics = loadedMetrics;
+                
+                // Migration: Initialize PreviousAbsoluteMin for existing data
+                foreach (var kvp in _cryptoMetrics)
+                {
+                    if (kvp.Value.PreviousAbsoluteMin == 0)
+                    {
+                        kvp.Value.PreviousAbsoluteMin = kvp.Value.AbsoluteMin;
+                        _logger.LogDebug($"Migrated PreviousAbsoluteMin for {kvp.Key}: {kvp.Value.PreviousAbsoluteMin:F8}");
+                    }
+                }
             }
 
             var oldestUpdate = _cryptoMetrics.Values.Min(m => m.LastUpdated);
@@ -468,9 +478,10 @@ public class CryptoManager : ICryptoManager
                     events.Add($"Price {price:F8} is below absolute minimum {updatedMetricsForSymbol.AbsoluteMin:F8} - NEW ABSOLUTE MIN");
                     hasEvents = true;
 
-                    // Update the absolute minimum
+                    // Update the absolute minimum and store the previous one
                     lock (_lockObject)
                     {
+                        _cryptoMetrics[symbol].PreviousAbsoluteMin = _cryptoMetrics[symbol].AbsoluteMin;
                         _cryptoMetrics[symbol].AbsoluteMin = price;
                     }
                 }
@@ -498,6 +509,7 @@ public class CryptoManager : ICryptoManager
                         AverageMax = _cryptoMetrics[symbol].AverageMax,
                         AbsoluteMin = _cryptoMetrics[symbol].AbsoluteMin,
                         AbsoluteMax = _cryptoMetrics[symbol].AbsoluteMax,
+                        PreviousAbsoluteMin = _cryptoMetrics[symbol].PreviousAbsoluteMin,
                         LastUpdated = _cryptoMetrics[symbol].LastUpdated,
                         CurrentPrice = _cryptoMetrics[symbol].CurrentPrice,
                         Volume = _cryptoMetrics[symbol].Volume,
@@ -654,6 +666,7 @@ public class CryptoManager : ICryptoManager
                 AverageMax = averageMax,
                 AbsoluteMin = absoluteMin,
                 AbsoluteMax = absoluteMax,
+                PreviousAbsoluteMin = absoluteMin, // Initialize to same value as absolute min
                 LastUpdated = DateTime.UtcNow,
                 CurrentPrice = 0,
                 Volume = 0,
@@ -868,6 +881,7 @@ public class CryptoMetrics
     public decimal AverageMax { get; set; }
     public decimal AbsoluteMin { get; set; }
     public decimal AbsoluteMax { get; set; }
+    public decimal PreviousAbsoluteMin { get; set; } // Track previous absolute minimum
     public DateTime LastUpdated { get; set; }
     // New fields for average price tracking
     public decimal CurrentPrice { get; set; }
