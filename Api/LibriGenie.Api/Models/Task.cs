@@ -13,4 +13,6 @@ public class Task
     public DateTime? LastRun { get; set; }
     public List<string> Symbols { get; set; } = new List<string>();
     public List<string> PrimarySymbols { get; set; } = new List<string>();
+    public string? CoinbaseName { get; set; }
+    public string? CoinbasePrivateKey { get; set; }
 }

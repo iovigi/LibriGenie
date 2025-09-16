@@ -25,4 +25,8 @@ public class Settings
     public List<string> Symbols { get; set; } = new List<string>();
     [BsonElement("primarySymbols")]
     public List<string> PrimarySymbols { get; set; } = new List<string>();
+    [BsonElement("coinbaseName")]
+    public string? CoinbaseName { get; set; }
+    [BsonElement("coinbasePrivateKey")]
+    public string? CoinbasePrivateKey { get; set; }
 }

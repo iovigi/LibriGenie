@@ -41,7 +41,9 @@ builder.Services.AddSingleton<INewClient, NewClient>();
 builder.Services.AddSingleton<IContentGenerator, ContentGenerator>();
 builder.Services.AddSingleton<IDataClient, DataClient>();
 builder.Services.AddSingleton<IMailService, MailService>();
+builder.Services.AddSingleton<ICoinbaseService, CoinbaseService>();
 builder.Services.AddHttpClient<ICryptoManager, CryptoManager>();
+builder.Services.AddSingleton<ICryptoReportService, CryptoReportService>();
 builder.Services.AddMemoryCache();
 
 builder.Services.AddWindowsService(options =>

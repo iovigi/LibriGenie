@@ -870,6 +870,133 @@ public class CryptoManager : ICryptoManager
         }
     }
 
+    public async Task<List<Models.ShortTermInvestmentOpportunity>> AnalyzeShortTermInvestmentOpportunities(Dictionary<string, CryptoMetrics> cryptoMetrics, CancellationToken stoppingToken)
+    {
+        var opportunities = new List<Models.ShortTermInvestmentOpportunity>();
+
+        try
+        {
+            foreach (var kvp in cryptoMetrics)
+            {
+                var symbol = kvp.Key;
+                var metrics = kvp.Value;
+
+                // Skip if we don't have enough data
+                if (metrics.CurrentPrice <= 0 || metrics.DailyMin <= 0 || metrics.DailyMax <= 0)
+                    continue;
+
+                // Calculate Coinbase fees for trading
+                var buyFee = 1.5m; // 1.5 EUR fixed fee
+                var sellFee = 1.5m; // 1.5 EUR fixed fee
+                var priceFee = metrics.CurrentPrice * 0.0001m; // 0.01% of price
+                var totalFees = buyFee + sellFee + priceFee;
+
+                // Calculate daily opportunity scenarios
+                var currentPrice = metrics.CurrentPrice;
+                var dailyMin = metrics.DailyMin;
+                var dailyMax = metrics.DailyMax;
+                var dailyRange = dailyMax - dailyMin;
+
+                // Scenario 1: Buy at current price, sell at daily max
+                var profitAtDailyMax = dailyMax - currentPrice - totalFees;
+                var profitPercentageAtDailyMax = currentPrice > 0 ? (profitAtDailyMax / currentPrice) * 100 : 0;
+
+                // Scenario 2: Buy at daily min, sell at current price
+                var profitAtCurrentFromDailyMin = currentPrice - dailyMin - totalFees;
+                var profitPercentageAtCurrentFromDailyMin = dailyMin > 0 ? (profitAtCurrentFromDailyMin / dailyMin) * 100 : 0;
+
+                // Scenario 3: Buy at daily min, sell at daily max
+                var profitAtFullDailyRange = dailyMax - dailyMin - totalFees;
+                var profitPercentageAtFullDailyRange = dailyMin > 0 ? (profitAtFullDailyRange / dailyMin) * 100 : 0;
+
+                // Calculate investment amounts for 100 EUR limit check
+                var investmentAmountCurrentToMax = currentPrice > 0 ? 100m / currentPrice : 0;
+                var investmentAmountMinToCurrent = dailyMin > 0 ? 100m / dailyMin : 0;
+                var investmentAmountMinToMax = dailyMin > 0 ? 100m / dailyMin : 0;
+
+                // Calculate actual profit amounts for each scenario
+                var actualProfitCurrentToMax = investmentAmountCurrentToMax * profitAtDailyMax;
+                var actualProfitMinToCurrent = investmentAmountMinToCurrent * profitAtCurrentFromDailyMin;
+                var actualProfitMinToMax = investmentAmountMinToMax * profitAtFullDailyRange;
+
+                // Calculate risk metrics
+                var currentToMinDistance = currentPrice - dailyMin;
+                var currentToMaxDistance = dailyMax - currentPrice;
+                var riskRewardRatio = dailyRange > 0 ? Math.Abs(currentToMinDistance / dailyRange) : 0;
+
+                // Determine opportunity type and score
+                var opportunityType = "NONE";
+                var opportunityScore = 0m;
+                var recommendation = "";
+                var actualProfit = 0m;
+                var investmentAmount = 0m;
+
+                if (profitAtDailyMax > 0 && profitPercentageAtDailyMax > 1 && actualProfitCurrentToMax > 0) // At least 1% profit and positive actual profit
+                {
+                    opportunityType = "BUY_CURRENT_SELL_DAILY_MAX";
+                    opportunityScore = profitPercentageAtDailyMax;
+                    actualProfit = actualProfitCurrentToMax;
+                    investmentAmount = investmentAmountCurrentToMax;
+                    recommendation = $"Buy at current price {currentPrice:F8}, target sell at daily max {dailyMax:F8} for {profitPercentageAtDailyMax:F2}% profit (€{actualProfit:F2} profit on €100 investment)";
+                }
+                else if (profitAtCurrentFromDailyMin > 0 && profitPercentageAtCurrentFromDailyMin > 1 && actualProfitMinToCurrent > 0) // At least 1% profit and positive actual profit
+                {
+                    opportunityType = "BUY_DAILY_MIN_SELL_CURRENT";
+                    opportunityScore = profitPercentageAtCurrentFromDailyMin;
+                    actualProfit = actualProfitMinToCurrent;
+                    investmentAmount = investmentAmountMinToCurrent;
+                    recommendation = $"Buy at daily min {dailyMin:F8}, sell at current price {currentPrice:F8} for {profitPercentageAtCurrentFromDailyMin:F2}% profit (€{actualProfit:F2} profit on €100 investment)";
+                }
+                else if (profitAtFullDailyRange > 0 && profitPercentageAtFullDailyRange > 2 && actualProfitMinToMax > 0) // At least 2% profit for full range and positive actual profit
+                {
+                    opportunityType = "BUY_DAILY_MIN_SELL_DAILY_MAX";
+                    opportunityScore = profitPercentageAtFullDailyRange;
+                    actualProfit = actualProfitMinToMax;
+                    investmentAmount = investmentAmountMinToMax;
+                    recommendation = $"Buy at daily min {dailyMin:F8}, sell at daily max {dailyMax:F8} for {profitPercentageAtFullDailyRange:F2}% profit (€{actualProfit:F2} profit on €100 investment)";
+                }
+
+                // Only include opportunities with meaningful profit potential and positive actual profit
+                if (opportunityScore > 1 && actualProfit > 0)
+                {
+                    opportunities.Add(new Models.ShortTermInvestmentOpportunity
+                    {
+                        Symbol = symbol,
+                        OpportunityType = opportunityType,
+                        CurrentPrice = currentPrice,
+                        AverageMin = dailyMin, // Using daily min instead of 2-week average
+                        AverageMax = dailyMax, // Using daily max instead of 2-week average
+                        TwoWeekRange = dailyRange, // Using daily range instead of 2-week range
+                        TotalFees = totalFees,
+                        ProfitAtAvgMax = profitAtDailyMax,
+                        ProfitPercentageAtAvgMax = profitPercentageAtDailyMax,
+                        ProfitAtCurrentFromMin = profitAtCurrentFromDailyMin,
+                        ProfitPercentageAtCurrentFromMin = profitPercentageAtCurrentFromDailyMin,
+                        ProfitAtFullRange = profitAtFullDailyRange,
+                        ProfitPercentageAtFullRange = profitPercentageAtFullDailyRange,
+                        RiskRewardRatio = riskRewardRatio,
+                        Recommendation = recommendation,
+                        OpportunityScore = opportunityScore,
+                        Volume = metrics.Volume,
+                        DailyVolatilityCount = metrics.DailyVolatilityCount
+                    });
+                }
+            }
+
+            // Sort by opportunity score (highest first)
+            opportunities = opportunities.OrderByDescending(o => o.OpportunityScore).ToList();
+
+            _logger.LogInformation("Analyzed {count} symbols for daily investment opportunities (€100 max), found {opportunities} with potential", 
+                cryptoMetrics.Count, opportunities.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error analyzing daily investment opportunities: {message}", ex.Message);
+        }
+
+        return opportunities;
+    }
+
 
 }
 

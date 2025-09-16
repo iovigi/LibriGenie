@@ -38,6 +38,8 @@ public class TaskService(IMongoDatabase database) : ITaskService
                 LastRun = x.Settings!.LastRun,
                 Symbols = x.Settings!.Symbols ?? new List<string>(),
                 PrimarySymbols = x.Settings!.PrimarySymbols ?? new List<string>(),
+                CoinbaseName = x.Settings!.CoinbaseName,
+                CoinbasePrivateKey = x.Settings!.CoinbasePrivateKey,
             })
             .ToListAsync(cancellationToken);
     }
@@ -60,6 +62,8 @@ public class TaskService(IMongoDatabase database) : ITaskService
                 LastRun = x.Settings!.LastRun,
                 Symbols = x.Settings!.Symbols ?? new List<string>(),
                 PrimarySymbols = x.Settings!.PrimarySymbols ?? new List<string>(),
+                CoinbaseName = x.Settings!.CoinbaseName,
+                CoinbasePrivateKey = x.Settings!.CoinbasePrivateKey,
             })
             .ToListAsync(cancellationToken);
     }

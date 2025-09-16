@@ -22,6 +22,8 @@ const Dashboard = function Dashboard() {
     const [availableSymbols, setAvailableSymbols] = useState([]);
     const [loadingSymbols, setLoadingSymbols] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [coinbaseName, setCoinbaseName] = useState('');
+    const [coinbasePrivateKey, setCoinbasePrivateKey] = useState('');
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -30,7 +32,7 @@ const Dashboard = function Dashboard() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: "same-origin",
-            body: JSON.stringify({ category, typeTrigger, cron, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, enable, symbols, primarySymbols }),
+            body: JSON.stringify({ category, typeTrigger, cron, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, enable, symbols, primarySymbols, coinbaseName, coinbasePrivateKey }),
         })
 
         if (response.ok) {
@@ -63,6 +65,8 @@ const Dashboard = function Dashboard() {
                 setCron(data.settings?.cron);
                 setSymbols(data.settings?.symbols || []);
                 setPrimarySymbols(data.settings?.primarySymbols || []);
+                setCoinbaseName(data.settings?.coinbaseName || '');
+                setCoinbasePrivateKey(data.settings?.coinbasePrivateKey || '');
             })
     }, [])
 
@@ -362,6 +366,38 @@ const Dashboard = function Dashboard() {
                                          )}
                                      </div>
                                  </div>
+                             )}
+                             
+                             {category === 'CryptoSpikes' && (
+                                 <>
+                                     <div className='row mt-3'>
+                                         <label className='form-label' htmlFor='coinbase-name'>Coinbase Account Name</label>
+                                         <div className='col-12'>
+                                             <input 
+                                                 type="text" 
+                                                 className='form-control' 
+                                                 value={coinbaseName} 
+                                                 onChange={(e) => setCoinbaseName(e.target.value)} 
+                                                 placeholder='Enter your Coinbase account name' 
+                                             />
+                                         </div>
+                                     </div>
+                                     <div className='row mt-3'>
+                                         <label className='form-label' htmlFor='coinbase-private-key'>Coinbase Private Key</label>
+                                         <div className='col-12'>
+                                             <input 
+                                                 type="password" 
+                                                 className='form-control' 
+                                                 value={coinbasePrivateKey} 
+                                                 onChange={(e) => setCoinbasePrivateKey(e.target.value)} 
+                                                 placeholder='Enter your Coinbase private key' 
+                                             />
+                                             <small className="form-text text-muted">
+                                                 This will be used for enhanced crypto monitoring and trading features.
+                                             </small>
+                                         </div>
+                                     </div>
+                                 </>
                              )}
                              
                              <div className='row mt-3'>
