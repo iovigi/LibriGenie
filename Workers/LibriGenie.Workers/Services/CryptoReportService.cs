@@ -166,7 +166,7 @@ public class CryptoReportService : ICryptoReportService
                 emailBody += "🚀 DAILY INVESTMENT OPPORTUNITIES (€100 MAX) 🚀\n";
                 emailBody += "===============================================\n\n";
                 emailBody += "Based on daily price analysis with Coinbase fees (1.5 EUR buy + 1.5 EUR sell + 0.01% of price)\n";
-                emailBody += "All opportunities calculated for maximum €100 investment to ensure profitable returns\n\n";
+                emailBody += "All opportunities calculated for maximum €100 investment, targeting daily average price for selling\n\n";
 
                 foreach (var opportunity in relevantOpportunities)
                 {
@@ -175,7 +175,7 @@ public class CryptoReportService : ICryptoReportService
                     emailBody += $"Opportunity Score: {opportunity.OpportunityScore:F2}%\n";
                     emailBody += $"Current Price: {opportunity.CurrentPrice:F8}\n";
                     emailBody += $"Daily Min: {opportunity.AverageMin:F8}\n";
-                    emailBody += $"Daily Max: {opportunity.AverageMax:F8}\n";
+                    emailBody += $"Daily Average: {opportunity.AverageMax:F8}\n";
                     emailBody += $"Daily Range: {opportunity.TwoWeekRange:F8}\n";
                     emailBody += $"Total Fees (Buy+Sell): {opportunity.TotalFees:F8}\n";
                     emailBody += $"Volume: {opportunity.Volume:F2}\n";
@@ -184,17 +184,9 @@ public class CryptoReportService : ICryptoReportService
                     emailBody += $"Recommendation: {opportunity.Recommendation}\n";
                     
                     // Show profit scenarios
-                    if (opportunity.ProfitAtAvgMax > 0)
+                    if (opportunity.ProfitAtAvg > 0)
                     {
-                        emailBody += $"  • Buy Current → Sell at Daily Max: {opportunity.ProfitPercentageAtAvgMax:F2}% profit\n";
-                    }
-                    if (opportunity.ProfitAtCurrentFromMin > 0)
-                    {
-                        emailBody += $"  • Buy at Daily Min → Sell Current: {opportunity.ProfitPercentageAtCurrentFromMin:F2}% profit\n";
-                    }
-                    if (opportunity.ProfitAtFullRange > 0)
-                    {
-                        emailBody += $"  • Buy at Daily Min → Sell at Daily Max: {opportunity.ProfitPercentageAtFullRange:F2}% profit\n";
+                        emailBody += $"  • Buy Current → Sell at Daily Average: {opportunity.ProfitPercentageAtAvg:F2}% profit (€{opportunity.ProfitAtAvg:F2} profit)\n";
                     }
                     
                     emailBody += "\n";

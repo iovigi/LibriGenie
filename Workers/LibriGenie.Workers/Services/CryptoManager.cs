@@ -891,33 +891,27 @@ public class CryptoManager : ICryptoManager
                 var priceFee = metrics.CurrentPrice * 0.0001m; // 0.01% of price
                 var totalFees = buyFee + sellFee + priceFee;
 
-                // Calculate daily opportunity scenarios
+                // Calculate daily opportunity scenarios using daily average price for selling
                 var currentPrice = metrics.CurrentPrice;
                 var dailyMin = metrics.DailyMin;
                 var dailyMax = metrics.DailyMax;
+                var dailyAverage = metrics.AveragePrice; // Use daily average price for selling
                 var dailyRange = dailyMax - dailyMin;
 
-                // Scenario 1: Buy at current price, sell at daily max
-                var profitAtDailyMax = dailyMax - currentPrice - totalFees;
-                var profitPercentageAtDailyMax = currentPrice > 0 ? (profitAtDailyMax / currentPrice) * 100 : 0;
+                // Skip if we don't have daily average price data
+                if (dailyAverage <= 0)
+                    continue;
 
-                // Scenario 2: Buy at daily min, sell at current price
-                var profitAtCurrentFromDailyMin = currentPrice - dailyMin - totalFees;
-                var profitPercentageAtCurrentFromDailyMin = dailyMin > 0 ? (profitAtCurrentFromDailyMin / dailyMin) * 100 : 0;
-
-                // Scenario 3: Buy at daily min, sell at daily max
-                var profitAtFullDailyRange = dailyMax - dailyMin - totalFees;
-                var profitPercentageAtFullDailyRange = dailyMin > 0 ? (profitAtFullDailyRange / dailyMin) * 100 : 0;
+                // Only scenario: Buy at current price, sell at daily average
+                var profitAtDailyAverage = dailyAverage - currentPrice - totalFees;
+                var profitPercentageAtDailyAverage = currentPrice > 0 ? (profitAtDailyAverage / currentPrice) * 100 : 0;
 
                 // Calculate investment amounts for 100 EUR limit check
-                var investmentAmountCurrentToMax = currentPrice > 0 ? 100m / currentPrice : 0;
-                var investmentAmountMinToCurrent = dailyMin > 0 ? 100m / dailyMin : 0;
-                var investmentAmountMinToMax = dailyMin > 0 ? 100m / dailyMin : 0;
+                var investmentAmountCurrentToAverage = currentPrice > 0 ? 100m / currentPrice : 0;
 
-                // Calculate actual profit amounts for each scenario
-                var actualProfitCurrentToMax = investmentAmountCurrentToMax * profitAtDailyMax;
-                var actualProfitMinToCurrent = investmentAmountMinToCurrent * profitAtCurrentFromDailyMin;
-                var actualProfitMinToMax = investmentAmountMinToMax * profitAtFullDailyRange;
+                // Calculate actual profit amounts for the scenario
+                // For €100 investment: (sellPrice - buyPrice) * coinAmount - totalFees
+                var actualProfitCurrentToAverage = investmentAmountCurrentToAverage * (dailyAverage - currentPrice) - totalFees;
 
                 // Calculate risk metrics
                 var currentToMinDistance = currentPrice - dailyMin;
@@ -931,29 +925,13 @@ public class CryptoManager : ICryptoManager
                 var actualProfit = 0m;
                 var investmentAmount = 0m;
 
-                if (profitAtDailyMax > 0 && profitPercentageAtDailyMax > 1 && actualProfitCurrentToMax > 0) // At least 1% profit and positive actual profit
+                if (profitAtDailyAverage > 0 && profitPercentageAtDailyAverage > 1 && actualProfitCurrentToAverage > 0) // At least 1% profit and positive actual profit
                 {
-                    opportunityType = "BUY_CURRENT_SELL_DAILY_MAX";
-                    opportunityScore = profitPercentageAtDailyMax;
-                    actualProfit = actualProfitCurrentToMax;
-                    investmentAmount = investmentAmountCurrentToMax;
-                    recommendation = $"Buy at current price {currentPrice:F8}, target sell at daily max {dailyMax:F8} for {profitPercentageAtDailyMax:F2}% profit (€{actualProfit:F2} profit on €100 investment)";
-                }
-                else if (profitAtCurrentFromDailyMin > 0 && profitPercentageAtCurrentFromDailyMin > 1 && actualProfitMinToCurrent > 0) // At least 1% profit and positive actual profit
-                {
-                    opportunityType = "BUY_DAILY_MIN_SELL_CURRENT";
-                    opportunityScore = profitPercentageAtCurrentFromDailyMin;
-                    actualProfit = actualProfitMinToCurrent;
-                    investmentAmount = investmentAmountMinToCurrent;
-                    recommendation = $"Buy at daily min {dailyMin:F8}, sell at current price {currentPrice:F8} for {profitPercentageAtCurrentFromDailyMin:F2}% profit (€{actualProfit:F2} profit on €100 investment)";
-                }
-                else if (profitAtFullDailyRange > 0 && profitPercentageAtFullDailyRange > 2 && actualProfitMinToMax > 0) // At least 2% profit for full range and positive actual profit
-                {
-                    opportunityType = "BUY_DAILY_MIN_SELL_DAILY_MAX";
-                    opportunityScore = profitPercentageAtFullDailyRange;
-                    actualProfit = actualProfitMinToMax;
-                    investmentAmount = investmentAmountMinToMax;
-                    recommendation = $"Buy at daily min {dailyMin:F8}, sell at daily max {dailyMax:F8} for {profitPercentageAtFullDailyRange:F2}% profit (€{actualProfit:F2} profit on €100 investment)";
+                    opportunityType = "BUY_CURRENT_SELL_DAILY_AVERAGE";
+                    opportunityScore = profitPercentageAtDailyAverage;
+                    actualProfit = actualProfitCurrentToAverage;
+                    investmentAmount = investmentAmountCurrentToAverage;
+                    recommendation = $"Buy at current price {currentPrice:F8}, target sell at daily average {dailyAverage:F8} for {profitPercentageAtDailyAverage:F2}% profit (€{actualProfit:F2} profit on €100 investment)";
                 }
 
                 // Only include opportunities with meaningful profit potential and positive actual profit
@@ -964,16 +942,16 @@ public class CryptoManager : ICryptoManager
                         Symbol = symbol,
                         OpportunityType = opportunityType,
                         CurrentPrice = currentPrice,
-                        AverageMin = dailyMin, // Using daily min instead of 2-week average
-                        AverageMax = dailyMax, // Using daily max instead of 2-week average
-                        TwoWeekRange = dailyRange, // Using daily range instead of 2-week range
+                        AverageMin = dailyMin, // Using daily min
+                        AverageMax = dailyAverage, // Using daily average price instead of daily max
+                        TwoWeekRange = dailyRange, // Using daily range
                         TotalFees = totalFees,
-                        ProfitAtAvgMax = profitAtDailyMax,
-                        ProfitPercentageAtAvgMax = profitPercentageAtDailyMax,
-                        ProfitAtCurrentFromMin = profitAtCurrentFromDailyMin,
-                        ProfitPercentageAtCurrentFromMin = profitPercentageAtCurrentFromDailyMin,
-                        ProfitAtFullRange = profitAtFullDailyRange,
-                        ProfitPercentageAtFullRange = profitPercentageAtFullDailyRange,
+                        ProfitAtAvg = actualProfitCurrentToAverage, // Actual profit when selling at daily average
+                        ProfitPercentageAtAvg = profitPercentageAtDailyAverage, // Percentage profit when selling at daily average
+                        ProfitAtAvgFromMin = 0, // Not used - no daily min scenarios
+                        ProfitPercentageAtAvgFromMin = 0, // Not used - no daily min scenarios
+                        ProfitAtFullRange = actualProfitCurrentToAverage, // Same as main scenario
+                        ProfitPercentageAtFullRange = profitPercentageAtDailyAverage, // Same as main scenario
                         RiskRewardRatio = riskRewardRatio,
                         Recommendation = recommendation,
                         OpportunityScore = opportunityScore,
@@ -986,7 +964,7 @@ public class CryptoManager : ICryptoManager
             // Sort by opportunity score (highest first)
             opportunities = opportunities.OrderByDescending(o => o.OpportunityScore).ToList();
 
-            _logger.LogInformation("Analyzed {count} symbols for daily investment opportunities (€100 max), found {opportunities} with potential", 
+            _logger.LogInformation("Analyzed {count} symbols for daily investment opportunities (€100 max, selling at daily average), found {opportunities} with potential", 
                 cryptoMetrics.Count, opportunities.Count);
         }
         catch (Exception ex)
