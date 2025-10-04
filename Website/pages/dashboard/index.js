@@ -3,11 +3,15 @@ import Link from 'next/link';
 import styles from '../../styles/Dashboard/Dashboard.module.css';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Cron from 'react-js-cron';
+import 'react-js-cron/dist/styles.css';
 
 import { toast } from 'react-hot-toast';
 
 
 const Dashboard = function Dashboard() {
+    const [currentTaskId, setCurrentTaskId] = useState('');
+    const [tasks, setTasks] = useState([]);
     const [typeTrigger, setTypeTrigger] = useState(0);
     const [category, setCategory] = useState('');
     const [cron, setCron] = useState('');
@@ -24,50 +28,153 @@ const Dashboard = function Dashboard() {
     const [searchTerm, setSearchTerm] = useState('');
     const [coinbaseName, setCoinbaseName] = useState('');
     const [coinbasePrivateKey, setCoinbasePrivateKey] = useState('');
+    const [taskName, setTaskName] = useState('');
+    const [eventBase, setEventBase] = useState(false);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
+
+        const settingData = {
+            name: taskName,
+            category, 
+            typeTrigger, 
+            cron, 
+            time, 
+            enableWordpress, 
+            urlWordpress, 
+            usernameWordpress, 
+            passwordWordpress, 
+            enable, 
+            symbols, 
+            primarySymbols, 
+            coinbaseName, 
+            coinbasePrivateKey,
+            eventBase
+        };
 
         const response = await fetch('/api/dashboard/save-settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: "same-origin",
-            body: JSON.stringify({ category, typeTrigger, cron, time, enableWordpress, urlWordpress, usernameWordpress, passwordWordpress, enable, symbols, primarySymbols, coinbaseName, coinbasePrivateKey }),
+            body: JSON.stringify({ 
+                action: currentTaskId ? 'update' : 'add',
+                settingId: currentTaskId,
+                setting: settingData
+            }),
         })
 
         if (response.ok) {
             toast.success("Successfully updated");
+            loadTasks();
         }
         else {
             toast.error("Something went wrong");
         }
     }
 
-    useEffect(() => {
-        fetch('/api/dashboard/get-settings', {
-            headers: { 'Content-Type': 'application/json' },
-            credentials: "same-origin",
-        })
-            .then((res) => res.json())
-            .then((data) => {
-                if (!data.settings) {
-                    return;
+    const loadTasks = async () => {
+        try {
+            const response = await fetch('/api/dashboard/get-settings', {
+                headers: { 'Content-Type': 'application/json' },
+                credentials: "same-origin",
+            });
+            const data = await response.json();
+            
+            if (data.ok && data.settings) {
+                setTasks(data.settings);
+                if (data.settings.length > 0 && !currentTaskId) {
+                    setCurrentTaskId(data.settings[0].id);
+                    loadTaskData(data.settings[0]);
                 }
+            }
+        } catch (error) {
+            console.error('Error loading tasks:', error);
+        }
+    }
 
-                setCategory(data.settings?.category);
-                setTime(data.settings?.time);
-                setEnableWordpress(data.settings?.enableWordpress);
-                setUrlWordpress(data.settings?.urlWordpress);
-                setUsernameWordpress(data.settings?.usernameWordpress);
-                setPasswordWordpress(data.settings?.passwordWordpress);
-                setEnable(data.settings?.enable);
-                setTypeTrigger(data.settings?.typeTrigger);
-                setCron(data.settings?.cron);
-                setSymbols(data.settings?.symbols || []);
-                setPrimarySymbols(data.settings?.primarySymbols || []);
-                setCoinbaseName(data.settings?.coinbaseName || '');
-                setCoinbasePrivateKey(data.settings?.coinbasePrivateKey || '');
-            })
+    const loadTaskData = (task) => {
+        setTaskName(task.name || '');
+        setCategory(task.category || '');
+        setTime(task.time || '00:00');
+        setEnableWordpress(task.enableWordpress || false);
+        setUrlWordpress(task.urlWordpress || '');
+        setUsernameWordpress(task.usernameWordpress || '');
+        setPasswordWordpress(task.passwordWordpress || '');
+        setEnable(task.enable || false);
+        setTypeTrigger(task.typeTrigger || 0);
+        setCron(task.cron || '');
+        setSymbols(task.symbols || []);
+        setPrimarySymbols(task.primarySymbols || []);
+        setCoinbaseName(task.coinbaseName || '');
+        setCoinbasePrivateKey(task.coinbasePrivateKey || '');
+        setEventBase(task.eventBase || false);
+    }
+
+    const handleTaskSelect = (taskId) => {
+        setCurrentTaskId(taskId);
+        const selectedTask = tasks.find(task => task.id === taskId);
+        if (selectedTask) {
+            loadTaskData(selectedTask);
+        }
+    }
+
+    const handleAddTask = () => {
+        setCurrentTaskId('');
+        setTaskName('');
+        setCategory('');
+        setTime('00:00');
+        setEnableWordpress(false);
+        setUrlWordpress('');
+        setUsernameWordpress('');
+        setPasswordWordpress('');
+        setEnable(false);
+        setTypeTrigger(0);
+        setCron('');
+        setSymbols([]);
+        setPrimarySymbols([]);
+        setCoinbaseName('');
+        setCoinbasePrivateKey('');
+        setEventBase(false);
+    }
+
+    const handleDeleteTask = async () => {
+        if (!currentTaskId) return;
+        
+        if (confirm('Are you sure you want to delete this task?')) {
+            try {
+                const response = await fetch('/api/dashboard/save-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: "same-origin",
+                    body: JSON.stringify({ 
+                        action: 'delete',
+                        settingId: currentTaskId
+                    }),
+                });
+
+                if (response.ok) {
+                    toast.success("Task deleted successfully");
+                    loadTasks();
+                    if (tasks.length > 1) {
+                        const remainingTasks = tasks.filter(task => task.id !== currentTaskId);
+                        if (remainingTasks.length > 0) {
+                            setCurrentTaskId(remainingTasks[0].id);
+                            loadTaskData(remainingTasks[0]);
+                        }
+                    } else {
+                        handleAddTask();
+                    }
+                } else {
+                    toast.error("Failed to delete task");
+                }
+            } catch (error) {
+                toast.error("Error deleting task");
+            }
+        }
+    }
+
+    useEffect(() => {
+        loadTasks();
     }, [])
 
     // Fetch crypto symbols when Crypto Spikes category is selected
@@ -198,6 +305,62 @@ const Dashboard = function Dashboard() {
                     </div>
                                          <div className='container d-flex justify-content-center align-items-center'>
                          <form className='row w-75' onSubmit={handleSubmit}>
+                             {/* Task Management Section */}
+                             <div className='row mt-3'>
+                                 <div className='col-12'>
+                                     <div className='d-flex justify-content-between align-items-center mb-3'>
+                                         <div className='d-flex align-items-center gap-3'>
+                                             <label className='form-label mb-0'>Task:</label>
+                                             <select 
+                                                 className='form-select' 
+                                                 style={{width: '300px'}}
+                                                 value={currentTaskId} 
+                                                 onChange={(e) => handleTaskSelect(e.target.value)}
+                                             >
+                                                 <option value="">Select a task...</option>
+                                                 {tasks.map(task => (
+                                                     <option key={task.id} value={task.id}>
+                                                         {task.name || `Task ${task.id.substring(0, 8)}`}
+                                                     </option>
+                                                 ))}
+                                             </select>
+                                         </div>
+                                         <div className='d-flex gap-2'>
+                                             <button 
+                                                 type="button" 
+                                                 className='btn btn-success btn-sm'
+                                                 onClick={handleAddTask}
+                                             >
+                                                 Add Task
+                                             </button>
+                                             {currentTaskId && (
+                                                 <button 
+                                                     type="button" 
+                                                     className='btn btn-danger btn-sm'
+                                                     onClick={handleDeleteTask}
+                                                 >
+                                                     Delete Task
+                                                 </button>
+                                             )}
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                             
+                             {/* Task Name */}
+                             <div className='row mt-3'>
+                                 <label className='form-label' htmlFor='taskName'>Task Name</label>
+                                 <div className='col-12'>
+                                     <input 
+                                         type="text" 
+                                         className='form-control' 
+                                         value={taskName} 
+                                         onChange={(e) => setTaskName(e.target.value)} 
+                                         placeholder='Enter a name for this task'
+                                         required
+                                     />
+                                 </div>
+                             </div>
                              <div className='row mt-3'>
                                  <label className='form-label' htmlFor='category'>Category</label>
                                  <div className='col-12'> <select className='form-select' value={category} required onChange={(e) => setCategory(e.target.value)}>
@@ -209,36 +372,62 @@ const Dashboard = function Dashboard() {
                                  </select></div>
                              </div>
                              
+                             <div className='row mt-3'>
+                                 <div className='col-12'>
+                                     <div className='form-check'>
+                                         <input 
+                                             name="event-base" 
+                                             className='form-check-input' 
+                                             type='checkbox' 
+                                             checked={eventBase} 
+                                             onChange={(e) => setEventBase(e.target.checked)} 
+                                         />
+                                         <label className='form-check-label' htmlFor='event-base'>Event Base</label>
+                                     </div>
+                                 </div>
+                             </div>
                              
-                                                           {category !== 'CryptoSpikes' && (
+                             
+                                                           {!eventBase && (
                                   <div className='row mt-3 col-12'>
-                                      <label className='form-label' htmlFor='time'>Cron Expression or time of the day to trigger the generation</label>
+                                      <label className='form-label' htmlFor='typeTrigger'>Trigger Type</label>
                                       <div className='col-12'>
-                                          <div class="form-check">
-                                              <input type="radio" name="type-trigger" value="0" defaultChecked checked={typeTrigger == 0} onChange={(e) => setTypeTrigger(e.target.value)} className='form-check-input' />
-                                              <label class="form-check-label" for="0">
-                                                  Time of the day to trigger
-                                              </label>
-                                          </div>
-                                          <div class="form-check">
-                                              <input type="radio" name="type-trigger" value="1" checked={typeTrigger == 1} onChange={(e) => setTypeTrigger(e.target.value)} className='form-check-input' />
-                                              <label class="form-check-label" for="1">
-                                                  Cron
-                                              </label>
-                                          </div>
+                                          <select 
+                                              className='form-select' 
+                                              value={typeTrigger} 
+                                              onChange={(e) => setTypeTrigger(parseInt(e.target.value))}
+                                          >
+                                              <option value="0">Time of the day to trigger</option>
+                                              <option value="1">Cron Expression</option>
+                                          </select>
                                       </div>
                                   </div>
                               )}
-                                                         {category !== 'CryptoSpikes' && typeTrigger == 0 && <div className='row mt-3 col-12'>
+                                                         {!eventBase && typeTrigger == 0 && <div className='row mt-3 col-12'>
                                  <label className='form-label' htmlFor='time'>UTC Time of the day to trigger the generation</label>
                                  <div className='col-12'>
                                      <input required type="time" className='form-control' value={time} onChange={(e) => setTime(e.target.value)} />
                                  </div>
                              </div>}
-                             {category !== 'CryptoSpikes' && typeTrigger == 1 && <div className='row mt-3 col-12'>
+                             {!eventBase && typeTrigger == 1 && <div className='row mt-3 col-12'>
                                  <label className='form-label' htmlFor='cron'>Cron Expression</label>
                                  <div className='col-12'>
-                                     <input required type="input" className='form-control' value={cron} onChange={(e) => setCron(e.target.value)} />
+                                     <div className="border rounded p-3 bg-light">
+                                         <Cron 
+                                             value={cron} 
+                                             setValue={setCron}
+                                             defaultPeriod="day"
+                                             humanizeLabels={true}
+                                             clearButton={true}
+                                         />
+                                     </div>
+                                     {cron && (
+                                         <div className="mt-2">
+                                             <small className="text-muted">
+                                                 <strong>Expression:</strong> <code>{cron}</code>
+                                             </small>
+                                         </div>
+                                     )}
                                  </div>
                              </div>}
                             <div className='row mt-3'>

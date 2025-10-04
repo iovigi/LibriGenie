@@ -13,5 +13,5 @@ public class User
     public string Email { get; set; }
 
     [BsonElement("settings")]
-    public Settings? Settings { get; set; }
+    public List<Settings> Settings { get; set; } = new List<Settings>();
 }

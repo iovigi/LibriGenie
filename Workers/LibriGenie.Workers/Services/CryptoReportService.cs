@@ -448,8 +448,12 @@ public class CryptoReportService : ICryptoReportService
                 }
             }
 
-            // Send email
-            var subject = "Crypto Spike Alerts & Metrics";
+            // Send email with dynamic subject based on opportunities
+                
+            var subject = relevantOpportunities.Any() 
+                ? $"🚀 INVESTMENT OPPORTUNITIES FOUND ({relevantOpportunities.Count}) - Crypto Alerts"
+                : "Crypto Spike Alerts & Metrics";
+                
             await _mailService.Send(task.Email, subject, emailBody, stoppingToken);
 
             _logger.LogInformation("Sent crypto report to {email} for {count} symbols with events (total symbols: {totalSymbols})",

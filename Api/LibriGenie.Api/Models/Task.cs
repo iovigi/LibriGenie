@@ -15,4 +15,7 @@ public class Task
     public List<string> PrimarySymbols { get; set; } = new List<string>();
     public string? CoinbaseName { get; set; }
     public string? CoinbasePrivateKey { get; set; }
+    public bool EventBase { get; set; }
+    public int TypeTrigger { get; set; }
+    public string? Cron { get; set; }
 }

@@ -1,5 +1,5 @@
 import { IsAuth } from "../../../services/auth/is-auth-service"
-import { SaveSettings } from "../../../services/dashboard/settings-service"
+import { SaveSettings, AddSetting, UpdateSetting, DeleteSetting } from "../../../services/dashboard/settings-service"
 
 export default async function handler(req, res) {
     const currentUser = req.cookies['token'];
@@ -12,7 +12,27 @@ export default async function handler(req, res) {
         res.status(401).json({ ok: false });
     }
 
-    SaveSettings(currentUser, req.body);
+    const { action, settingId, setting } = req.body;
 
-    res.status(200).json({ ok: true });
+    try {
+        switch (action) {
+            case 'add':
+                await AddSetting(currentUser, setting);
+                break;
+            case 'update':
+                await UpdateSetting(currentUser, settingId, setting);
+                break;
+            case 'delete':
+                await DeleteSetting(currentUser, settingId);
+                break;
+            default:
+                // Legacy support - save all settings
+                await SaveSettings(currentUser, req.body);
+                break;
+        }
+
+        res.status(200).json({ ok: true });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: error.message });
+    }
 }
