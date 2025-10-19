@@ -2,8 +2,12 @@ import { verifyAccessToken } from "../auth/token-generation";
 import { users } from "../db/db";
 
 export async function SaveSettings(token, settings) {
-    let userId = (await verifyAccessToken(token)).userId;
-
+    const tokenResult = await verifyAccessToken(token);
+    if (!tokenResult || tokenResult.error) {
+        throw new Error('Invalid or expired token');
+    }
+    
+    let userId = tokenResult.userId;
     let result = await users.find({ id: userId }).limit(1).toArray();
     let user = result[0];
     user.settings = settings;
@@ -13,14 +17,24 @@ export async function SaveSettings(token, settings) {
 }
 
 export async function GetSettings(token) {
-    let userId = (await verifyAccessToken(token)).userId;
+    const tokenResult = await verifyAccessToken(token);
+    if (!tokenResult || tokenResult.error) {
+        throw new Error('Invalid or expired token');
+    }
+    
+    let userId = tokenResult.userId;
     let result = await users.find({ id: userId }).limit(1).toArray();
     let user = result[0];
     return user.settings || [];
 }
 
 export async function AddSetting(token, setting) {
-    let userId = (await verifyAccessToken(token)).userId;
+    const tokenResult = await verifyAccessToken(token);
+    if (!tokenResult || tokenResult.error) {
+        throw new Error('Invalid or expired token');
+    }
+    
+    let userId = tokenResult.userId;
     
     // Generate a new ID for the setting
     const newSetting = {
@@ -42,7 +56,12 @@ export async function AddSetting(token, setting) {
 }
 
 export async function UpdateSetting(token, settingId, setting) {
-    let userId = (await verifyAccessToken(token)).userId;
+    const tokenResult = await verifyAccessToken(token);
+    if (!tokenResult || tokenResult.error) {
+        throw new Error('Invalid or expired token');
+    }
+    
+    let userId = tokenResult.userId;
 
     await users.updateOne(
         { id: userId, "settings.id": settingId },
@@ -58,7 +77,12 @@ export async function UpdateSetting(token, settingId, setting) {
 }
 
 export async function DeleteSetting(token, settingId) {
-    let userId = (await verifyAccessToken(token)).userId;
+    const tokenResult = await verifyAccessToken(token);
+    if (!tokenResult || tokenResult.error) {
+        throw new Error('Invalid or expired token');
+    }
+    
+    let userId = tokenResult.userId;
 
     await users.updateOne(
         { id: userId },

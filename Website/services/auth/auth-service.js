@@ -1,34 +1,101 @@
 import { users } from "../db/db";
-import { generateAccessToken } from "./token-generation";
+import { generateAccessToken, generateRefreshToken } from "./token-generation";
+import { validatePassword, validateEmail } from "./password-validation";
 import bcrypt from 'bcrypt'
 
 export async function SignIn(email, password) {
+    // Validate email format
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+        return { isSuccess: false, message: "Invalid email format" };
+    }
+
     let result = await users.find({ email: email }).limit(1).toArray();
 
     if (result.length == 0) {
-        return { isSuccess: false, message: "Invalid email" };
+        return { isSuccess: false, message: "Invalid email or password" };
     }
 
     let user = result[0];
     const isSuccess = await bcrypt.compare(password, user.password);
 
     if (isSuccess) {
-        return { isSuccess: true, token: await generateAccessToken(user.id) };
+        // Update last login
+        await users.updateOne(
+            { id: user.id },
+            { $set: { lastLogin: new Date() } }
+        );
+
+        // Prepare user claims for JWT
+        const userClaims = {
+            email: user.email,
+            role: user.role || 'user',
+            permissions: user.permissions || [],
+            lastLogin: new Date().toISOString(),
+            accountStatus: user.accountStatus || 'active'
+        };
+
+        const accessToken = await generateAccessToken(user.id, userClaims);
+        const refreshToken = await generateRefreshToken(user.id, userClaims);
+
+        return { 
+            isSuccess: true, 
+            accessToken: accessToken,
+            refreshToken: refreshToken
+        };
     }
 
     return { isSuccess: false, message: "Invalid email or password" };
 }
 
 export async function SignUp(email, password) {
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+        return { isSuccess: false, message: emailValidation.error };
+    }
+
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+        return { isSuccess: false, message: passwordValidation.errors.join(", ") };
+    }
+
     let result = await users.find({ email: email }).limit(1).toArray();
     if (result.length > 0) {
         return { isSuccess: false, message: "User already exists" };
     }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    let user = { id: generateUUID(), email: email, password: hashedPassword };
+    
+    const hashedPassword = await bcrypt.hash(password, 12); // Increased salt rounds
+    let user = { 
+        id: generateUUID(), 
+        email: email, 
+        password: hashedPassword,
+        role: 'user',
+        permissions: [],
+        accountStatus: 'active',
+        createdAt: new Date(),
+        lastLogin: null
+    };
     await users.insertOne(user);
 
-    return { isSuccess: true, token: await generateAccessToken(user.id) };
+    // Prepare user claims for JWT
+    const userClaims = {
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions,
+        lastLogin: new Date().toISOString(),
+        accountStatus: user.accountStatus
+    };
+
+    const accessToken = await generateAccessToken(user.id, userClaims);
+    const refreshToken = await generateRefreshToken(user.id, userClaims);
+
+    return { 
+        isSuccess: true, 
+        accessToken: accessToken,
+        refreshToken: refreshToken
+    };
 }
 
 function generateUUID() { // Public Domain/MIT

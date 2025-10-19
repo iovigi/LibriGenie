@@ -10,6 +10,7 @@ import { toast } from 'react-hot-toast';
 
 
 const Dashboard = function Dashboard() {
+    const router = useRouter();
     const [currentTaskId, setCurrentTaskId] = useState('');
     const [tasks, setTasks] = useState([]);
     const [typeTrigger, setTypeTrigger] = useState(0);
@@ -30,6 +31,29 @@ const Dashboard = function Dashboard() {
     const [coinbasePrivateKey, setCoinbasePrivateKey] = useState('');
     const [taskName, setTaskName] = useState('');
     const [eventBase, setEventBase] = useState(false);
+
+    const handleLogout = async () => {
+        try {
+            const response = await fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Logout successful:', result);
+                router.push('/');
+            } else {
+                const error = await response.json();
+                console.error('Logout failed:', error);
+                toast.error("Logout failed: " + (error.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+            toast.error("Logout failed: " + error.message);
+        }
+    };
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -55,7 +79,7 @@ const Dashboard = function Dashboard() {
         const response = await fetch('/api/dashboard/save-settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: "same-origin",
+            credentials: 'include',
             body: JSON.stringify({ 
                 action: currentTaskId ? 'update' : 'add',
                 settingId: currentTaskId,
@@ -76,7 +100,7 @@ const Dashboard = function Dashboard() {
         try {
             const response = await fetch('/api/dashboard/get-settings', {
                 headers: { 'Content-Type': 'application/json' },
-                credentials: "same-origin",
+                credentials: 'include',
             });
             const data = await response.json();
             
@@ -145,7 +169,7 @@ const Dashboard = function Dashboard() {
                 const response = await fetch('/api/dashboard/save-settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    credentials: "same-origin",
+                    credentials: 'include',
                     body: JSON.stringify({ 
                         action: 'delete',
                         settingId: currentTaskId
@@ -183,7 +207,7 @@ const Dashboard = function Dashboard() {
             setLoadingSymbols(true);
             fetch('/api/crypto/crypto-symbols', {
                 headers: { 'Content-Type': 'application/json' },
-                credentials: "same-origin",
+                credentials: 'include',
             })
                 .then((res) => res.json())
                 .then((data) => {
@@ -277,6 +301,16 @@ const Dashboard = function Dashboard() {
         </Head>
         <header className="navbar sticky-top bg-dark flex-md-nowrap p-0 shadow" data-bs-theme="dark">
             <a className="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6 text-white" href="#">Libri Genie</a>
+            <div className="navbar-nav">
+                <div className="nav-item text-nowrap">
+                    <button 
+                        className="btn btn-outline-light btn-sm" 
+                        onClick={handleLogout}
+                    >
+                        Logout
+                    </button>
+                </div>
+            </div>
         </header>
 
         <div className="container-fluid">
